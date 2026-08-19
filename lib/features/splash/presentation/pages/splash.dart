@@ -35,7 +35,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
           final authRepo = ref.read(authRepositoryProvider);
           final UserEntity? user = authRepo.currentUser;
           if (user != null) {
-            context.go('/account');
+            context.go('/home');
           } else {
             context.go('/auth/sign-in');
           }

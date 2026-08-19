@@ -7,6 +7,8 @@ import 'features/account/presentation/pages/account.dart';
 import 'features/auth/presentation/pages/sign_in.dart';
 import 'features/auth/presentation/pages/hosting_wizard_page.dart';
 import 'features/splash/presentation/pages/splash.dart';
+import 'features/home/presentation/pages/home.dart';
+import 'core/widgets/app_shell.dart';
 import 'core/config/app_environment.dart';
 
 final configServiceProvider = Provider((ref) => ConfigService());
@@ -76,6 +78,7 @@ void main() async {
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: AppBannerService.navigatorKey,
     initialLocation: '/',
     redirect: (BuildContext context, GoRouterState state) {
       bool hasConfig = false;
@@ -99,13 +102,11 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (loggedIn) {
         if (goingTo == '/auth/sign-in' || goingTo == '/hosting-wizard') {
-          return '/account';
+          return '/home';
         }
         return null;
       } else {
-        if (goingTo != '/' &&
-            goingTo != '/auth/sign-in' &&
-            goingTo != '/hosting-wizard') {
+        if (goingTo != '/' && goingTo != '/auth/sign-in' && goingTo != '/hosting-wizard') {
           return '/auth/sign-in';
         }
         return null;
@@ -122,9 +123,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/auth/sign-in',
         builder: (context, state) => const SignInPage(),
       ),
-      GoRoute(
-        path: '/account',
-        builder: (context, state) => const AccountPage(),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return NavigatorScafold(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/home',
+                builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/account',
+                builder: (context, state) => const AccountPage(),
+              ),
+            ],
+          ),
+        ],
       ),
     ],
   );

@@ -18,7 +18,7 @@ class SignInPage extends ConsumerWidget {
         color: theme.colorScheme.primary,
       ),
       onSignInSuccess: () {
-        context.go('/account'); // Routing directly to account as requested
+        context.go('/home'); // Routing directly to home
       },
       onResetBackend: () async {
         final router = GoRouter.of(context);
