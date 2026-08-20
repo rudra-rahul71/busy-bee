@@ -121,7 +121,7 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: widget.navigationShell,
+      body: SafeArea(child: widget.navigationShell),
       bottomNavigationBar: SafeArea(
         top: false,
         child: _buildBottomIsland(context),
