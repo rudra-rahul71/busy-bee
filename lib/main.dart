@@ -8,7 +8,6 @@ import 'firebase_options.dart';
 import 'features/account/presentation/pages/account.dart';
 import 'features/auth/presentation/pages/sign_in.dart';
 import 'features/auth/presentation/pages/hosting_wizard_page.dart';
-import 'features/splash/presentation/pages/splash.dart';
 import 'features/home/presentation/pages/home.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/config/app_environment.dart';
@@ -105,19 +104,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       final bool loggedIn = user != null;
 
       if (loggedIn) {
-        if (goingTo == '/auth/sign-in' || goingTo == '/hosting-wizard') {
+        if (goingTo == '/' || goingTo == '/auth/sign-in' || goingTo == '/hosting-wizard') {
           return '/home';
         }
         return null;
       } else {
-        if (goingTo != '/' && goingTo != '/auth/sign-in' && goingTo != '/hosting-wizard') {
+        if (goingTo != '/auth/sign-in' && goingTo != '/hosting-wizard') {
           return '/auth/sign-in';
         }
         return null;
       }
     },
     routes: <RouteBase>[
-      GoRoute(path: '/', builder: (context, state) => const SplashPage()),
       GoRoute(
         path: '/hosting-wizard',
         builder: (context, state) =>

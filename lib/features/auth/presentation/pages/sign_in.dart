@@ -15,10 +15,10 @@ class SignInPage extends ConsumerWidget {
       body: SafeArea(
         child: DynamicSignInPage(
           appName: 'BUSY BEE',
-          appIcon: Icon(
-            Icons.hive_outlined,
-            size: 120,
-            color: theme.colorScheme.primary,
+          appIcon: Image.asset(
+            'assets/images/app_icon.png',
+            width: 120,
+            height: 120,
           ),
           onSignInSuccess: () {
             context.go('/home'); // Routing directly to home
