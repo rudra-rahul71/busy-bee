@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dynamic_backend_bridge/dynamic_backend_bridge.dart';
+import 'package:firebase_core/firebase_core.dart';
 
+import 'firebase_options.dart';
 import 'features/account/presentation/pages/account.dart';
 import 'features/auth/presentation/pages/sign_in.dart';
 import 'features/auth/presentation/pages/hosting_wizard_page.dart';
@@ -38,7 +40,7 @@ Future<void> initializeBackend(
     defaultNotificationChannelId: 'busy_bee',
     defaultNotificationChannelName: 'Busy Bee Notifications',
     defaultNotificationChannelDesc: 'Notifications for Busy Bee',
-    enableRemoteNotifications: false,
+    enableRemoteNotifications: true,
     appId: 'busy_bee',
   );
 }
@@ -48,7 +50,9 @@ void main() async {
 
   // Try to init firebase, ignore if missing config
   try {
-    // await Firebase.initializeApp(); // Uncomment if firebase_options are set up
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
   } catch (e) {
     debugPrint('Firebase init error: $e');
   }
