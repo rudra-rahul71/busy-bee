@@ -37,18 +37,16 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(24.0),
-                child: PageHeader(
-                  header: 'Busy Bee',
-                  sub: 'Manage your daily tasks and events',
-                ),
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(24.0),
+              child: PageHeader(
+                header: 'Busy Bee',
+                sub: 'Manage your daily tasks and events',
               ),
             ),
-            SliverToBoxAdapter(
+            Expanded(
               child: HomeCalendar(
                 focusedDay: _focusedDay,
                 selectedDay: _selectedDay,

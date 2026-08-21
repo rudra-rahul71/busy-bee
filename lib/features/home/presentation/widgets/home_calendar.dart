@@ -36,7 +36,7 @@ class HomeCalendar extends StatelessWidget {
           firstDay: DateTime.utc(2020, 1, 1),
           lastDay: DateTime.utc(2030, 12, 31),
           focusedDay: focusedDay,
-          rowHeight: 75,
+          shouldFillViewport: true,
           selectedDayPredicate: (day) => isSameDay(selectedDay, day),
           onDaySelected: onDaySelected,
           eventLoader: eventLoader,
