@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../domain/models/day_data.dart';
 import '../widgets/home_calendar.dart';
+import '../widgets/daily_details_widget.dart';
 import '../../../../core/widgets/page_header.dart';
 
 class HomePage extends StatefulWidget {
@@ -27,6 +28,35 @@ class _HomePageState extends State<HomePage> {
     return [];
   }
 
+  void _showMobileBottomSheet(BuildContext context, DateTime day, DayData data) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: DailyDetailsWidget(
+                selectedDay: day,
+                dayData: data,
+                isScrollable: true,
+                scrollController: scrollController,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -47,16 +77,55 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             Expanded(
-              child: HomeCalendar(
-                focusedDay: _focusedDay,
-                selectedDay: _selectedDay,
-                onDaySelected: (selectedDay, focusedDay) {
-                  setState(() {
-                    _selectedDay = selectedDay;
-                    _focusedDay = focusedDay;
-                  });
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isLargeScreen = constraints.maxWidth >= 850;
+                  final dayEvents = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
+                  final dayData = dayEvents.isNotEmpty ? dayEvents.first : const DayData();
+
+                  final calendarWidget = HomeCalendar(
+                    focusedDay: _focusedDay,
+                    selectedDay: _selectedDay,
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                      });
+                      
+                      if (!isLargeScreen) {
+                        final events = _getEventsForDay(selectedDay);
+                        final data = events.isNotEmpty ? events.first : const DayData();
+                        _showMobileBottomSheet(context, selectedDay, data);
+                      }
+                    },
+                    eventLoader: _getEventsForDay,
+                  );
+
+                  if (isLargeScreen) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: DailyDetailsWidget(
+                              selectedDay: _selectedDay ?? _focusedDay,
+                              dayData: dayData,
+                            ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 4,
+                            child: calendarWidget,
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    return calendarWidget;
+                  }
                 },
-                eventLoader: _getEventsForDay,
               ),
             ),
           ],

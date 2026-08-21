@@ -186,7 +186,7 @@ class HomeCalendar extends StatelessWidget {
                       ),
                     if (taskMarkers.isNotEmpty)
                       Positioned(
-                        bottom: 4,
+                        top: 26,
                         left: 4,
                         right: 4,
                         child: Column(
