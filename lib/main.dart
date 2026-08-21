@@ -11,6 +11,9 @@ import 'features/account/presentation/pages/account.dart';
 import 'features/auth/presentation/pages/sign_in.dart';
 import 'features/auth/presentation/pages/hosting_wizard_page.dart';
 import 'features/home/presentation/pages/home.dart';
+import 'features/events/presentation/pages/events.dart';
+import 'features/tasks/presentation/pages/tasks.dart';
+import 'features/trackers/presentation/pages/trackers.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/config/app_environment.dart';
 
@@ -141,6 +144,30 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/home',
                 builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/events',
+                builder: (context, state) => const EventsPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/tasks',
+                builder: (context, state) => const TasksPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/trackers',
+                builder: (context, state) => const TrackersPage(),
               ),
             ],
           ),

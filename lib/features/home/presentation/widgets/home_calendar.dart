@@ -8,6 +8,7 @@ class HomeCalendar extends StatelessWidget {
   final DateTime? selectedDay;
   final Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
   final List<DayData> Function(DateTime day) eventLoader;
+  final EdgeInsetsGeometry margin;
 
   const HomeCalendar({
     super.key,
@@ -15,6 +16,7 @@ class HomeCalendar extends StatelessWidget {
     this.selectedDay,
     required this.onDaySelected,
     required this.eventLoader,
+    this.margin = const EdgeInsets.all(16.0),
   });
 
   @override
@@ -29,7 +31,7 @@ class HomeCalendar extends StatelessWidget {
         ),
       ),
       color: colorScheme.surface,
-      margin: const EdgeInsets.all(16.0),
+      margin: margin,
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: TableCalendar<DayData>(

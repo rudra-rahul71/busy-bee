@@ -25,6 +25,21 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
       label: 'Home',
     ),
     _Destination(
+      icon: Icons.event_outlined,
+      selectedIcon: Icons.event,
+      label: 'Events',
+    ),
+    _Destination(
+      icon: Icons.checklist_outlined,
+      selectedIcon: Icons.checklist,
+      label: 'Tasks',
+    ),
+    _Destination(
+      icon: Icons.track_changes_outlined,
+      selectedIcon: Icons.track_changes,
+      label: 'Trackers',
+    ),
+    _Destination(
       icon: Icons.account_circle_outlined,
       selectedIcon: Icons.account_circle,
       label: 'Account',
@@ -65,7 +80,7 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 8.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: List.generate(_destinations.length, (index) {
@@ -79,7 +94,7 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
                   duration: const Duration(milliseconds: 250),
                   curve: Curves.easeInOut,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
+                    horizontal: 8.0,
                     vertical: 8.0,
                   ),
                   decoration: BoxDecoration(
