@@ -34,7 +34,9 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
   Widget _buildBottomIsland(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final islandWidth = width < 600 ? double.infinity : 480.0;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Center(
       heightFactor: 1.0,
@@ -50,13 +52,15 @@ class _NavigatorScafoldState extends State<NavigatorScafold> {
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.4),
+              color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
           ],
           border: Border.all(
-            color: colorScheme.onSurface.withValues(alpha: 0.08),
+            color: colorScheme.onSurface.withValues(
+              alpha: isDark ? 0.08 : 0.12,
+            ),
             width: 1.5,
           ),
         ),

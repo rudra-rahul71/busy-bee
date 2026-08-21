@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:dynamic_backend_bridge/dynamic_backend_bridge.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'firebase_options.dart';
 import 'features/account/presentation/pages/account.dart';
 import 'features/auth/presentation/pages/sign_in.dart';
@@ -56,14 +58,20 @@ void main() async {
     debugPrint('Firebase init error: $e');
   }
 
+  final prefs = await SharedPreferences.getInstance();
+
   final configService = ConfigService();
   final savedConfig = await configService.getSavedConfig();
 
   final container = ProviderContainer(
-    overrides: [configServiceProvider.overrideWithValue(configService)],
+    overrides: [
+      sharedPreferencesProvider.overrideWithValue(prefs),
+      configServiceProvider.overrideWithValue(configService),
+    ],
   );
 
   if (savedConfig != null) {
+    container.read(appConfigProvider.notifier).setConfig(savedConfig);
     try {
       await initializeBackend(savedConfig, container: container);
     } catch (e) {
@@ -71,12 +79,7 @@ void main() async {
     }
   }
 
-  runApp(
-    UncontrolledProviderScope(
-      container: container,
-      child: MyApp(initialConfig: savedConfig),
-    ),
-  );
+  runApp(UncontrolledProviderScope(container: container, child: const MyApp()));
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -90,7 +93,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         hasConfig = true;
       } catch (_) {}
 
-      final String goingTo = state.fullPath ?? '/';
+      final String goingTo = state.matchedLocation;
 
       if (!hasConfig) {
         if (goingTo != '/hosting-wizard') {
@@ -104,7 +107,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final bool loggedIn = user != null;
 
       if (loggedIn) {
-        if (goingTo == '/' || goingTo == '/auth/sign-in' || goingTo == '/hosting-wizard') {
+        if (goingTo == '/' ||
+            goingTo == '/auth/sign-in' ||
+            goingTo == '/hosting-wizard') {
           return '/home';
         }
         return null;
@@ -116,6 +121,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
     },
     routes: <RouteBase>[
+      GoRoute(path: '/', redirect: (context, state) => '/home'),
       GoRoute(
         path: '/hosting-wizard',
         builder: (context, state) =>
@@ -152,28 +158,26 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class MyApp extends ConsumerStatefulWidget {
-  final AppConfig? initialConfig;
-  const MyApp({super.key, this.initialConfig});
+class MyApp extends ConsumerWidget {
+  const MyApp({super.key});
 
   @override
-  ConsumerState<MyApp> createState() => _MyAppState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lightTheme = AppTheme.light(
+      primarySeed: const Color(0xFFD4AF37),
+      primary: const Color(0xFFD4AF37),
+      onPrimary: Colors.black,
+      secondary: const Color(0xFFE5A93C),
+      tertiary: const Color(0xFF006A60),
+      onTertiary: Colors.white,
+      error: const Color(0xFFBA1A1A),
+      onError: Colors.white,
+      surface: Colors.white,
+      onSurface: const Color(0xFF1E1E1E),
+      scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+    );
 
-class _MyAppState extends ConsumerState<MyApp> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (widget.initialConfig != null) {
-        ref.read(appConfigProvider.notifier).setConfig(widget.initialConfig);
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = AppTheme.build(
+    final darkTheme = AppTheme.dark(
       primarySeed: const Color(0xFFD4AF37),
       primary: const Color(0xFFD4AF37),
       onPrimary: Colors.black,
@@ -187,6 +191,8 @@ class _MyAppState extends ConsumerState<MyApp> {
       scaffoldBackgroundColor: const Color(0xFF121212),
     );
 
+    final themeMode = ref.watch(themeModeProvider);
+
     // Watch auth changes so the router can rebuild its redirect logic
     try {
       ref.watch(currentUserProvider);
@@ -197,7 +203,9 @@ class _MyAppState extends ConsumerState<MyApp> {
     return MaterialApp.router(
       title: 'Busy Bee',
       debugShowCheckedModeBanner: false,
-      theme: theme,
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
