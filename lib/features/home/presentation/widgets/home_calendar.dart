@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../../../core/utils/date_utils.dart';
 import '../../domain/models/day_data.dart';
 
 class HomeCalendar extends StatelessWidget {
@@ -9,6 +10,7 @@ class HomeCalendar extends StatelessWidget {
   final Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
   final List<DayData> Function(DateTime day) eventLoader;
   final EdgeInsetsGeometry margin;
+  final Map<String, Set<String>> trackerHistoryMap;
 
   const HomeCalendar({
     super.key,
@@ -16,6 +18,7 @@ class HomeCalendar extends StatelessWidget {
     this.selectedDay,
     required this.onDaySelected,
     required this.eventLoader,
+    required this.trackerHistoryMap,
     this.margin = const EdgeInsets.all(16.0),
   });
 
@@ -26,9 +29,7 @@ class HomeCalendar extends StatelessWidget {
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: colorScheme.onSurface.withValues(alpha: 0.08),
-        ),
+        side: BorderSide(color: colorScheme.onSurface.withValues(alpha: 0.08)),
       ),
       color: colorScheme.surface,
       margin: margin,
@@ -169,21 +170,53 @@ class HomeCalendar extends StatelessWidget {
                   children: [
                     if (trackers.isNotEmpty)
                       Positioned(
-                        top: 7,
-                        right: 7,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: trackers.take(4).map((color) {
-                            return Container(
-                              margin: const EdgeInsets.only(left: 2.0),
-                              width: 5,
-                              height: 5,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                              ),
-                            );
-                          }).toList(),
+                        top: 12,
+                        right: 8,
+                        child: SizedBox(
+                          width: 12,
+                          child: Wrap(
+                            spacing: 1.5,
+                            runSpacing: 1.5,
+                            alignment: WrapAlignment.end,
+                            children: trackers
+                                .where((tracker) {
+                                  final lookupKey =
+                                      "${tracker.id}_${day.dateKey}";
+                                  final hasCompletion =
+                                      trackerHistoryMap[lookupKey]?.contains(
+                                        'completion',
+                                      ) ??
+                                      false;
+                                  final hasSlipUp =
+                                      trackerHistoryMap[lookupKey]?.contains(
+                                        'slip_up',
+                                      ) ??
+                                      false;
+
+                                  if (tracker.trackerType == 'quit') {
+                                    // Quit habits default to true (red dot) unless explicitly slipped up
+                                    return !hasSlipUp;
+                                  } else {
+                                    // Maintain habits ONLY show a blue dot if completed
+                                    return hasCompletion;
+                                  }
+                                })
+                                .take(4)
+                                .map((tracker) {
+                                  final color = tracker.trackerType == 'quit'
+                                      ? Theme.of(context).colorScheme.error
+                                      : Theme.of(context).colorScheme.tertiary;
+                                  return Container(
+                                    width: 4.5,
+                                    height: 4.5,
+                                    decoration: BoxDecoration(
+                                      color: color,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  );
+                                })
+                                .toList(),
+                          ),
                         ),
                       ),
                     if (taskMarkers.isNotEmpty)

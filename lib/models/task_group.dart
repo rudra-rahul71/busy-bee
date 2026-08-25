@@ -30,9 +30,17 @@ class TaskGroup {
       name: json['name'] as String,
       colorValue: json['colorValue'] as int? ?? 4283215696,
       rrule: json['rrule'] as String?,
-      ruleStartDate: json['ruleStartDate'] != null ? DateTime.parse(json['ruleStartDate'] as String) : null,
-      ruleEndDate: json['ruleEndDate'] != null ? DateTime.parse(json['ruleEndDate'] as String) : null,
-      exdate: (json['exdate'] as List<dynamic>?)?.map((e) => DateTime.parse(e as String)).toList() ?? [],
+      ruleStartDate: json['ruleStartDate'] != null
+          ? DateTime.parse(json['ruleStartDate'] as String)
+          : null,
+      ruleEndDate: json['ruleEndDate'] != null
+          ? DateTime.parse(json['ruleEndDate'] as String)
+          : null,
+      exdate:
+          (json['exdate'] as List<dynamic>?)
+              ?.map((e) => DateTime.parse(e as String))
+              .toList() ??
+          [],
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );

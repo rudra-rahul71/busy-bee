@@ -41,9 +41,17 @@ class Event {
       dtstart: DateTime.parse(json['dtstart'] as String),
       dtend: DateTime.parse(json['dtend'] as String),
       rrule: json['rrule'] as String?,
-      ruleStartDate: json['ruleStartDate'] != null ? DateTime.parse(json['ruleStartDate'] as String) : null,
-      ruleEndDate: json['ruleEndDate'] != null ? DateTime.parse(json['ruleEndDate'] as String) : null,
-      exdate: (json['exdate'] as List<dynamic>?)?.map((e) => DateTime.parse(e as String)).toList() ?? [],
+      ruleStartDate: json['ruleStartDate'] != null
+          ? DateTime.parse(json['ruleStartDate'] as String)
+          : null,
+      ruleEndDate: json['ruleEndDate'] != null
+          ? DateTime.parse(json['ruleEndDate'] as String)
+          : null,
+      exdate:
+          (json['exdate'] as List<dynamic>?)
+              ?.map((e) => DateTime.parse(e as String))
+              .toList() ??
+          [],
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),

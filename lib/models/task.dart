@@ -47,18 +47,31 @@ class Task {
       summary: json['summary'] as String,
       description: json['description'] as String?,
       location: json['location'] as String?,
-      steps: (json['steps'] as List<dynamic>?)
+      steps:
+          (json['steps'] as List<dynamic>?)
               ?.map((e) => TaskStep.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
-      dtstart: json['dtstart'] != null ? DateTime.parse(json['dtstart'] as String) : null,
+      dtstart: json['dtstart'] != null
+          ? DateTime.parse(json['dtstart'] as String)
+          : null,
       due: json['due'] != null ? DateTime.parse(json['due'] as String) : null,
       status: json['status'] as String,
-      completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
+      completedAt: json['completedAt'] != null
+          ? DateTime.parse(json['completedAt'] as String)
+          : null,
       rrule: json['rrule'] as String?,
-      ruleStartDate: json['ruleStartDate'] != null ? DateTime.parse(json['ruleStartDate'] as String) : null,
-      ruleEndDate: json['ruleEndDate'] != null ? DateTime.parse(json['ruleEndDate'] as String) : null,
-      exdate: (json['exdate'] as List<dynamic>?)?.map((e) => DateTime.parse(e as String)).toList() ?? [],
+      ruleStartDate: json['ruleStartDate'] != null
+          ? DateTime.parse(json['ruleStartDate'] as String)
+          : null,
+      ruleEndDate: json['ruleEndDate'] != null
+          ? DateTime.parse(json['ruleEndDate'] as String)
+          : null,
+      exdate:
+          (json['exdate'] as List<dynamic>?)
+              ?.map((e) => DateTime.parse(e as String))
+              .toList() ??
+          [],
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
