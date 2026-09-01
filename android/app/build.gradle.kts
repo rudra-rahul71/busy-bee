@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.busy_bee"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = "28.2.13676358"
+    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
