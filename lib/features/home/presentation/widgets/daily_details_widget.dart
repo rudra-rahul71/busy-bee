@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
-import '../../domain/models/day_data.dart';
 
-class DailyDetailsWidget extends StatelessWidget {
+import '../../domain/models/day_data.dart';
+import '../../../../models/tracker.dart';
+import '../../../../core/utils/date_utils.dart';
+import '../../../trackers/data/tracker_providers.dart';
+import '../../../trackers/domain/tracker_calculator.dart';
+
+class DailyDetailsWidget extends ConsumerWidget {
   final DateTime selectedDay;
   final DayData dayData;
   final bool isScrollable;
@@ -17,89 +23,150 @@ class DailyDetailsWidget extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    Widget content = Column(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final formattedDate = DateFormat('EEEE, MMMM d').format(selectedDay);
+
+    final successfulTrackers = <Tracker>[];
+    final slippedTrackers = <Tracker>[];
+    final pendingTrackers = <Tracker>[];
+
+    final historyMap = ref.watch(
+      calendarTrackerHistoryByTrackerIdProvider(selectedDay.monthOnly),
+    );
+
+    for (final tracker in dayData.trackers) {
+      final history = historyMap[tracker.id] ?? [];
+
+      final isCompleted = TrackerCalculator.isCompletedOnDay(
+        tracker: tracker,
+        history: history,
+        day: selectedDay,
+      );
+      final isSlip = TrackerCalculator.hasSlipUpOnDay(
+        tracker: tracker,
+        history: history,
+        day: selectedDay,
+      );
+      final isPending = TrackerCalculator.isPendingOnDay(
+        tracker: tracker,
+        history: history,
+        day: selectedDay,
+      );
+
+      if (isCompleted) {
+        successfulTrackers.add(tracker);
+      } else if (isSlip) {
+        slippedTrackers.add(tracker);
+      } else if (isPending) {
+        pendingTrackers.add(tracker);
+      }
+    }
+
+    final hasTasks = dayData.tasks.isNotEmpty;
+    final hasTrackers =
+        successfulTrackers.isNotEmpty ||
+        pendingTrackers.isNotEmpty ||
+        slippedTrackers.isNotEmpty;
+
+    final listWidget = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          DateFormat('EEEE, MMMM d').format(selectedDay),
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (dayData.tasks.isEmpty && dayData.trackers.isEmpty)
-          Expanded(
+        if (!hasTasks && !hasTrackers)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32.0),
             child: Center(
-              child: Text(
-                'No events for this day.',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          )
-        else ...[
-          if (dayData.trackers.isNotEmpty) ...[
-            Text(
-              'Trackers',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: dayData.trackers.map((color) {
-                return Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.event_busy,
+                    size: 48,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                   ),
-                );
-              }).toList(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No tasks or habits for this day.',
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-          ],
-          if (dayData.tasks.isNotEmpty) ...[
+          ),
+
+        if (hasTasks) ...[
+          // --- TASKS SECTION ---
+          Text(
+            'TODAY\'S TASKS',
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.bold,
+              fontSize: 11,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...dayData.tasks.map((t) => ListTile(title: Text(t.summary))),
+
+          if (hasTrackers)
+            Divider(
+              height: 48,
+              thickness: 1,
+              color: colorScheme.onSurface.withValues(alpha: 0.1),
+            ),
+        ],
+
+        if (hasTrackers) ...[
+          // --- HABIT TRACKERS SECTION ---
+          if (successfulTrackers.isNotEmpty) ...[
             Text(
-              'Tasks',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+              'SUCCESSFUL HABITS / CLEAN DAYS',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 1.0,
               ),
             ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                physics: isScrollable ? const AlwaysScrollableScrollPhysics() : const NeverScrollableScrollPhysics(),
-                itemCount: dayData.tasks.length,
-                itemBuilder: (context, index) {
-                  final task = dayData.tasks[index];
-                  final isCompleted = task['isCompleted'] ?? false;
-                  final color = task['color'] as Color? ?? theme.colorScheme.primary;
-                  
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Icon(
-                      isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                      color: isCompleted ? color : theme.colorScheme.onSurfaceVariant,
-                    ),
-                    title: Text(
-                      task['name'] ?? 'Unknown Task',
-                      style: TextStyle(
-                        decoration: isCompleted ? TextDecoration.lineThrough : null,
-                        color: isCompleted ? theme.colorScheme.onSurfaceVariant : null,
-                      ),
-                    ),
-                  );
-                },
+            const SizedBox(height: 12),
+            ...successfulTrackers.map(
+              (t) => _buildDetailItem(context, t, true),
+            ),
+          ],
+
+          if (pendingTrackers.isNotEmpty) ...[
+            if (successfulTrackers.isNotEmpty) const SizedBox(height: 24),
+            Text(
+              'PENDING HABITS',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 1.0,
               ),
+            ),
+            const SizedBox(height: 12),
+            ...pendingTrackers.map((t) => _buildDetailItem(context, t, false)),
+          ],
+
+          if (slippedTrackers.isNotEmpty) ...[
+            if (successfulTrackers.isNotEmpty || pendingTrackers.isNotEmpty)
+              const SizedBox(height: 24),
+            Text(
+              'SLIPPED UP / BROKEN HABITS',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...slippedTrackers.map(
+              (t) => _buildDetailItem(context, t, false, isSlip: true),
             ),
           ],
         ],
@@ -107,16 +174,137 @@ class DailyDetailsWidget extends StatelessWidget {
     );
 
     return Card(
-      margin: EdgeInsets.zero,
+      elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+          color: colorScheme.onSurface.withValues(alpha: 0.08),
+          width: 1.5,
         ),
       ),
+      color: colorScheme.surface,
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: content,
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              formattedDate,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Habits & tasks completion details',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
+            Divider(
+              height: 32,
+              thickness: 1,
+              color: colorScheme.onSurface.withValues(alpha: 0.1),
+            ),
+
+            if (isScrollable)
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  child: listWidget,
+                ),
+              )
+            else
+              listWidget,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailItem(
+    BuildContext context,
+    Tracker tracker,
+    bool isCompleted, {
+    bool isSlip = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = tracker.trackerType == 'quit'
+        ? colorScheme.error
+        : colorScheme.tertiary;
+
+    final slipColor = colorScheme.error;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.onSurface.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSlip
+              ? slipColor.withValues(alpha: 0.3)
+              : isCompleted
+              ? color.withValues(alpha: 0.3)
+              : colorScheme.onSurface.withValues(alpha: 0.05),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(
+                  isSlip
+                      ? Icons.cancel_outlined
+                      : isCompleted
+                      ? Icons.check_circle
+                      : Icons.circle_outlined,
+                  color: isSlip
+                      ? slipColor
+                      : isCompleted
+                      ? color
+                      : colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    tracker.summary,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              tracker.trackerType == 'quit' ? 'Quit' : 'Maintain',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

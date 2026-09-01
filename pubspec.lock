@@ -552,7 +552,7 @@ packages:
     source: hosted
     version: "4.9.2"
   intl:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: intl
       sha256: "1ca20c894b1717686a2319b8548763d812bc0aabdac580420a44c5178c57a867"
@@ -855,6 +855,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.2"
+  rrule:
+    dependency: "direct main"
+    description:
+      name: rrule
+      sha256: f6f6ad5bf7b19d218d4c985d6055d3c9717f1d6efd5d1c0127b1146f1eb3640c
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.18"
   shared_preferences:
     dependency: "direct main"
     description:
@@ -1084,6 +1092,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.18"
+  time:
+    dependency: transitive
+    description:
+      name: time
+      sha256: "46187cf30bffdab28c56be9a63861b36e4ab7347bf403297595d6a97e10c789f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.6"
   timezone:
     dependency: transitive
     description:
@@ -1173,7 +1189,7 @@ packages:
     source: hosted
     version: "3.1.5"
   uuid:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: uuid
       sha256: "9b129329f58692f6e6578329498a8fe9fbe98f090beb764ffbb8ee2eadd01dcd"

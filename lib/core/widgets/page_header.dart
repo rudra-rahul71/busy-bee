@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class PageHeader extends StatefulWidget {
+class PageHeader extends StatelessWidget {
   final String header;
   final String sub;
   final Widget? action;
@@ -12,11 +12,6 @@ class PageHeader extends StatefulWidget {
     this.action,
   });
 
-  @override
-  State<PageHeader> createState() => _PageHeaderState();
-}
-
-class _PageHeaderState extends State<PageHeader> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -30,7 +25,7 @@ class _PageHeaderState extends State<PageHeader> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.header,
+                header,
                 style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
@@ -38,7 +33,7 @@ class _PageHeaderState extends State<PageHeader> {
               ),
               const SizedBox(height: 4),
               Text(
-                widget.sub,
+                sub,
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -46,7 +41,7 @@ class _PageHeaderState extends State<PageHeader> {
               ),
             ],
           ),
-          if (widget.action != null) widget.action!,
+          if (action != null) action!,
         ],
       ),
     );

@@ -1,34 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../domain/models/day_data.dart';
+import '../../data/calendar_providers.dart';
+import '../../../trackers/data/tracker_providers.dart';
 import '../widgets/home_calendar.dart';
 import '../widgets/daily_details_widget.dart';
+import '../../../../core/utils/date_utils.dart';
 import '../../../../core/widgets/page_header.dart';
 
-class HomePage extends StatefulWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  ConsumerState<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends ConsumerState<HomePage> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
 
-  // Data for events and trackers
-  final Map<DateTime, DayData> _events = {};
-
   List<DayData> _getEventsForDay(DateTime day) {
-    // Normalize time to compare dates only
+    final calendarData = ref.read(calendarDataProvider);
     final normalizedDay = DateTime(day.year, day.month, day.day);
-    if (_events.containsKey(normalizedDay)) {
-      return [_events[normalizedDay]!];
+    if (calendarData.containsKey(normalizedDay)) {
+      return [calendarData[normalizedDay]!];
     }
     return [];
   }
 
-  void _showMobileBottomSheet(BuildContext context, DateTime day, DayData data) {
+  void _showMobileBottomSheet(
+    BuildContext context,
+    DateTime day,
+    DayData data,
+  ) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -42,7 +47,9 @@ class _HomePageState extends State<HomePage> {
             return Container(
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               child: DailyDetailsWidget(
                 selectedDay: day,
@@ -65,6 +72,11 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(calendarDataProvider);
+    final trackerHistoryMap = ref.watch(
+      calendarTrackerHistoryLookupMapProvider(_focusedDay.monthOnly),
+    );
+
     return Scaffold(
       body: Column(
         children: [
@@ -79,31 +91,48 @@ class _HomePageState extends State<HomePage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isLargeScreen = constraints.maxWidth >= 850;
-                final dayEvents = _selectedDay != null ? _getEventsForDay(_selectedDay!) : [];
-                final dayData = dayEvents.isNotEmpty ? dayEvents.first : const DayData();
+                final dayEvents = _selectedDay != null
+                    ? _getEventsForDay(_selectedDay!)
+                    : [];
+                final dayData = dayEvents.isNotEmpty
+                    ? dayEvents.first
+                    : const DayData();
 
                 final calendarWidget = HomeCalendar(
                   focusedDay: _focusedDay,
                   selectedDay: _selectedDay,
-                  margin: isLargeScreen ? EdgeInsets.zero : const EdgeInsets.all(16.0),
+                  trackerHistoryMap: trackerHistoryMap,
+                  margin: isLargeScreen
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.all(16.0),
                   onDaySelected: (selectedDay, focusedDay) {
                     setState(() {
                       _selectedDay = selectedDay;
                       _focusedDay = focusedDay;
                     });
-                    
+
                     if (!isLargeScreen) {
                       final events = _getEventsForDay(selectedDay);
-                      final data = events.isNotEmpty ? events.first : const DayData();
+                      final data = events.isNotEmpty
+                          ? events.first
+                          : const DayData();
                       _showMobileBottomSheet(context, selectedDay, data);
                     }
+                  },
+                  onPageChanged: (focusedDay) {
+                    setState(() {
+                      _focusedDay = focusedDay;
+                    });
                   },
                   eventLoader: _getEventsForDay,
                 );
 
                 if (isLargeScreen) {
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24.0,
+                      vertical: 8.0,
+                    ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -115,10 +144,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         const SizedBox(width: 24),
-                        Expanded(
-                          flex: 4,
-                          child: calendarWidget,
-                        ),
+                        Expanded(flex: 4, child: calendarWidget),
                       ],
                     ),
                   );

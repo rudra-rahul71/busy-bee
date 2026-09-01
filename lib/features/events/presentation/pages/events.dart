@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../../../core/widgets/page_header.dart';
 
 class EventsPage extends StatelessWidget {
@@ -12,14 +13,14 @@ class EventsPage extends StatelessWidget {
         children: [
           const Padding(
             padding: EdgeInsets.all(24.0),
-            child: PageHeader(
-              header: 'Events',
-              sub: 'Manage your events',
-            ),
+            child: PageHeader(header: 'Events', sub: 'Manage your events'),
           ),
           Expanded(
             child: Center(
-              child: Text('Events Coming Soon', style: Theme.of(context).textTheme.titleLarge),
+              child: Text(
+                'Events Coming Soon',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
             ),
           ),
         ],
