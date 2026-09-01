@@ -6,6 +6,7 @@ import '../../data/calendar_providers.dart';
 import '../../../trackers/data/tracker_providers.dart';
 import '../widgets/home_calendar.dart';
 import '../widgets/daily_details_widget.dart';
+import '../../../../core/utils/date_utils.dart';
 import '../../../../core/widgets/page_header.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -72,7 +73,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(calendarDataProvider);
-    final trackerHistoryMap = ref.watch(trackerHistoryLookupMapProvider);
+    final trackerHistoryMap = ref.watch(
+      calendarTrackerHistoryLookupMapProvider(_focusedDay.monthOnly),
+    );
 
     return Scaffold(
       body: Column(
@@ -115,6 +118,11 @@ class _HomePageState extends ConsumerState<HomePage> {
                           : const DayData();
                       _showMobileBottomSheet(context, selectedDay, data);
                     }
+                  },
+                  onPageChanged: (focusedDay) {
+                    setState(() {
+                      _focusedDay = focusedDay;
+                    });
                   },
                   eventLoader: _getEventsForDay,
                 );

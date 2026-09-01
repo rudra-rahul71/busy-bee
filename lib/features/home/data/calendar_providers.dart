@@ -21,18 +21,14 @@ final calendarDataProvider = Provider<Map<DateTime, DayData>>((ref) {
   for (final tracker in trackers) {
     try {
       final rruleString = tracker.rrule ?? 'FREQ=DAILY';
-      // RRule string requires prefix RRULE: if passing full string, but RecurrenceRule.fromString handles it
-      // if it has RRULE: or not depending on parsing. RecurrenceRule.fromString expects just FREQ=...
-      String ruleToParse = rruleString;
-      if (!ruleToParse.startsWith('RRULE:')) {
-        ruleToParse = 'RRULE:$ruleToParse';
-      }
+      final ruleToParse = rruleString.startsWith('RRULE:')
+          ? rruleString
+          : 'RRULE:$rruleString';
       final rrule = RecurrenceRule.fromString(ruleToParse);
 
       final startDate = tracker.ruleStartDate.isUtc
           ? tracker.ruleStartDate
           : tracker.ruleStartDate.toUtc();
-
       final todayUtc = DateTime.utc(now.year, now.month, now.day, 23, 59, 59);
       final generationEnd = windowEnd.isBefore(todayUtc) ? windowEnd : todayUtc;
 
@@ -41,24 +37,18 @@ final calendarDataProvider = Provider<Map<DateTime, DayData>>((ref) {
         before: generationEnd,
       );
 
+      final normalizedToday = now.dateOnly;
+
       for (final inst in instances) {
         if (inst.isBefore(windowStart)) continue;
         if (tracker.ruleEndDate != null && inst.isAfter(tracker.ruleEndDate!)) {
           continue;
         }
 
-        final isExcluded = tracker.exdate.any((ex) => ex.isSameDay(inst));
-        if (isExcluded) continue;
-
-        // Normalize the date to local midnight for map keys
-        final localDate = inst.dateOnly;
-        final normalizedToday = now.dateOnly;
-
-        // Trackers should only be displayed up to the current day
+        final localDate = inst.toLocal().dateOnly;
         if (localDate.isAfter(normalizedToday)) continue;
 
         final currentData = map[localDate] ?? const DayData();
-
         map[localDate] = DayData(
           tasks: currentData.tasks,
           trackers: [...currentData.trackers, tracker],

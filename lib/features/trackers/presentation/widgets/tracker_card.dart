@@ -48,7 +48,7 @@ class TrackerCard extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               ref
-                  .read(trackerActionControllerProvider(tracker.id).notifier)
+                  .read(trackerActionControllerProvider.notifier)
                   .deleteTracker(tracker.id);
             },
             child: const Text('Delete'),
@@ -66,10 +66,7 @@ class TrackerCard extends ConsumerWidget {
 
     final now = DateTime.now();
 
-    ref.listen<AsyncValue<void>>(trackerActionControllerProvider(tracker.id), (
-      _,
-      state,
-    ) {
+    ref.listen<AsyncValue<void>>(trackerActionControllerProvider, (_, state) {
       if (!state.isLoading && state.hasError) {
         AppBannerService.showError(
           context,
@@ -79,17 +76,19 @@ class TrackerCard extends ConsumerWidget {
       }
     });
 
-    final actionState = ref.watch(trackerActionControllerProvider(tracker.id));
+    final actionState = ref.watch(trackerActionControllerProvider);
     final isLoading = actionState.isLoading;
 
     // Fast-path O(1) status and streak retrieval via counter caches
     final isCompletedToday =
-        tracker.lastCompletedDate != null &&
-        tracker.lastCompletedDate!.dateOnly.isSameDay(now.dateOnly);
+        !isQuit &&
+        tracker.lastEventDate != null &&
+        tracker.lastEventDate!.dateOnly.isSameDay(now.dateOnly);
 
     final isSlippedToday =
-        tracker.lastSlipUpDate != null &&
-        tracker.lastSlipUpDate!.dateOnly.isSameDay(now.dateOnly);
+        isQuit &&
+        tracker.lastEventDate != null &&
+        tracker.lastEventDate!.dateOnly.isSameDay(now.dateOnly);
 
     final streakText = TrackerCalculator.getFormattedStreak(
       tracker: tracker,
@@ -244,7 +243,9 @@ class TrackerCard extends ConsumerWidget {
                 Text(
                   tracker.ruleEndDate == null
                       ? (!isQuit
-                            ? '${(progressValue * 100).toStringAsFixed(0)}% of current day left'
+                            ? (isCompletedToday
+                                  ? '100% completed'
+                                  : '${(progressValue * 100).toStringAsFixed(0)}% of current day left')
                             : '${(progressValue * 100).toStringAsFixed(0)}% of today completed')
                       : '${(progressValue * 100).toStringAsFixed(0)}% completed',
                   style: TextStyle(
@@ -287,10 +288,7 @@ class TrackerCard extends ConsumerWidget {
                             type: 'completion',
                           );
                           ref
-                              .read(
-                                trackerActionControllerProvider(tracker.id)
-                                    .notifier,
-                              )
+                              .read(trackerActionControllerProvider.notifier)
                               .logHistory(newHistory);
 
                           AppBannerService.showSuccess(
@@ -375,10 +373,7 @@ class TrackerCard extends ConsumerWidget {
                             type: 'slip_up',
                           );
                           ref
-                              .read(
-                                trackerActionControllerProvider(tracker.id)
-                                    .notifier,
-                              )
+                              .read(trackerActionControllerProvider.notifier)
                               .logHistory(newHistory);
 
                           AppBannerService.showSuccess(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/models/day_data.dart';
 import '../../../../models/tracker.dart';
+import '../../../../core/utils/date_utils.dart';
 import '../../../trackers/data/tracker_providers.dart';
 import '../../../trackers/domain/tracker_calculator.dart';
 
@@ -31,7 +32,9 @@ class DailyDetailsWidget extends ConsumerWidget {
     final slippedTrackers = <Tracker>[];
     final pendingTrackers = <Tracker>[];
 
-    final historyMap = ref.watch(trackerHistoryByTrackerIdProvider);
+    final historyMap = ref.watch(
+      calendarTrackerHistoryByTrackerIdProvider(selectedDay.monthOnly),
+    );
 
     for (final tracker in dayData.trackers) {
       final history = historyMap[tracker.id] ?? [];

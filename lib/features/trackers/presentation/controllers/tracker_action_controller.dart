@@ -7,10 +7,6 @@ import '../../../../models/tracker_history.dart';
 import '../../data/tracker_providers.dart';
 
 class TrackerActionController extends AsyncNotifier<void> {
-  final String trackerId;
-
-  TrackerActionController(this.trackerId);
-
   @override
   FutureOr<void> build() {}
 
@@ -48,6 +44,6 @@ class TrackerActionController extends AsyncNotifier<void> {
 }
 
 final trackerActionControllerProvider =
-    AsyncNotifierProvider.family<TrackerActionController, void, String>(
+    AsyncNotifierProvider<TrackerActionController, void>(
       TrackerActionController.new,
     );

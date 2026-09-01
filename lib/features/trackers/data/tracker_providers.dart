@@ -4,7 +4,6 @@ import 'package:dynamic_backend_bridge/dynamic_backend_bridge.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../models/tracker.dart';
 import '../../../../models/tracker_history.dart';
-import '../domain/tracker_calculator.dart';
 
 final trackerCollectionProvider = Provider<TypedCollection<Tracker>>((ref) {
   final dbRepo = ref.watch(databaseRepositoryProvider);
@@ -21,13 +20,6 @@ final trackersStreamProvider = StreamProvider<List<Tracker>>((ref) {
   return collection.watch();
 });
 
-final trackerByIdProvider = Provider.family<Tracker?, String>((ref, trackerId) {
-  final trackersAsync = ref.watch(trackersStreamProvider);
-  final trackers = trackersAsync.value ?? [];
-  final matches = trackers.where((t) => t.id == trackerId);
-  return matches.isNotEmpty ? matches.first : null;
-});
-
 final trackerHistoryCollectionProvider =
     Provider<TypedCollection<TrackerHistory>>((ref) {
       final dbRepo = ref.watch(databaseRepositoryProvider);
@@ -39,45 +31,39 @@ final trackerHistoryCollectionProvider =
       );
     });
 
-final trackerStreakProvider = Provider.family<int, Tracker>((ref, tracker) {
-  return TrackerCalculator.calculateStreak(tracker: tracker);
-});
-
-/// Single aggregated stream for the user's tracker history.
-final allTrackerHistoryStreamProvider = StreamProvider<List<TrackerHistory>>((
-  ref,
-) {
-  final collection = ref.watch(trackerHistoryCollectionProvider);
-  return collection.watch();
-});
-
-/// Bounded monthly stream provider for calendar and history visualization.
-/// Limits data transfer to the specified month's window.
-final monthlyTrackerHistoryStreamProvider =
+/// Bounded window stream provider for calendar and history visualization.
+/// Captures the specified month plus the previous week and next week to catch calendar overflow.
+final calendarTrackerHistoryStreamProvider =
     StreamProvider.family<List<TrackerHistory>, DateTime>((ref, monthDate) {
       final collection = ref.watch(trackerHistoryCollectionProvider);
-      final startOfMonth = DateTime(monthDate.year, monthDate.month, 1);
-      final endOfMonth = DateTime(
-        monthDate.year,
-        monthDate.month + 1,
+      final normalizedMonth = monthDate.monthOnly;
+      final startOfWindow = normalizedMonth.subtract(const Duration(days: 7));
+      final endOfWindow = DateTime(
+        normalizedMonth.year,
+        normalizedMonth.month + 1,
         0,
         23,
         59,
         59,
-      );
+      ).add(const Duration(days: 7));
 
       return collection.watch(
         filters: [
-          QueryFilter.gte('date', startOfMonth),
-          QueryFilter.lte('date', endOfMonth),
+          QueryFilter.gte('date', startOfWindow),
+          QueryFilter.lte('date', endOfWindow),
         ],
       );
     });
 
-/// Pre-indexes tracker history grouped by trackerId in memory.
-final trackerHistoryByTrackerIdProvider =
-    Provider<Map<String, List<TrackerHistory>>>((ref) {
-      final historyAsync = ref.watch(allTrackerHistoryStreamProvider);
+/// Pre-indexes tracker history grouped by trackerId in memory for the bounded calendar window.
+final calendarTrackerHistoryByTrackerIdProvider =
+    Provider.family<Map<String, List<TrackerHistory>>, DateTime>((
+      ref,
+      monthDate,
+    ) {
+      final historyAsync = ref.watch(
+        calendarTrackerHistoryStreamProvider(monthDate.monthOnly),
+      );
       final historyList = historyAsync.value ?? [];
       final map = <String, List<TrackerHistory>>{};
       for (final item in historyList) {
@@ -86,16 +72,18 @@ final trackerHistoryByTrackerIdProvider =
       return map;
     });
 
-/// Pre-indexes tracker history into a quick O(1) lookup map of `"{trackerId}_{dateKey}" -> Set<String>`.
-final trackerHistoryLookupMapProvider = Provider<Map<String, Set<String>>>((
-  ref,
-) {
-  final historyAsync = ref.watch(allTrackerHistoryStreamProvider);
-  final historyList = historyAsync.value ?? [];
-  final map = <String, Set<String>>{};
-  for (final item in historyList) {
-    final key = "${item.trackerId}_${item.date.dateKey}";
-    map.putIfAbsent(key, () => {}).add(item.type);
-  }
-  return map;
-});
+/// Pre-indexes tracker history into a quick O(1) lookup map of `"{trackerId}_{dateKey}" -> Set<String>`
+/// for the bounded calendar window.
+final calendarTrackerHistoryLookupMapProvider =
+    Provider.family<Map<String, Set<String>>, DateTime>((ref, monthDate) {
+      final historyAsync = ref.watch(
+        calendarTrackerHistoryStreamProvider(monthDate.monthOnly),
+      );
+      final historyList = historyAsync.value ?? [];
+      final map = <String, Set<String>>{};
+      for (final item in historyList) {
+        final key = "${item.trackerId}_${item.date.dateKey}";
+        map.putIfAbsent(key, () => {}).add(item.type);
+      }
+      return map;
+    });

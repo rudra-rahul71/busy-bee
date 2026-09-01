@@ -8,6 +8,7 @@ class HomeCalendar extends StatelessWidget {
   final DateTime focusedDay;
   final DateTime? selectedDay;
   final Function(DateTime selectedDay, DateTime focusedDay) onDaySelected;
+  final Function(DateTime focusedDay)? onPageChanged;
   final List<DayData> Function(DateTime day) eventLoader;
   final EdgeInsetsGeometry margin;
   final Map<String, Set<String>> trackerHistoryMap;
@@ -17,6 +18,7 @@ class HomeCalendar extends StatelessWidget {
     required this.focusedDay,
     this.selectedDay,
     required this.onDaySelected,
+    this.onPageChanged,
     required this.eventLoader,
     required this.trackerHistoryMap,
     this.margin = const EdgeInsets.all(16.0),
@@ -42,6 +44,7 @@ class HomeCalendar extends StatelessWidget {
           shouldFillViewport: true,
           selectedDayPredicate: (day) => isSameDay(selectedDay, day),
           onDaySelected: onDaySelected,
+          onPageChanged: onPageChanged,
           eventLoader: eventLoader,
           calendarFormat: CalendarFormat.month,
           headerStyle: const HeaderStyle(

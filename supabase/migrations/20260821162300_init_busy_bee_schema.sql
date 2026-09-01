@@ -72,17 +72,13 @@ CREATE TABLE IF NOT EXISTS busy_bee.trackers (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "userId" TEXT NOT NULL DEFAULT (auth.uid()::text),
     summary TEXT NOT NULL,
-    description TEXT,
     "trackerType" TEXT NOT NULL DEFAULT 'maintain',
     rrule TEXT,
-    "ruleStartDate" TIMESTAMPTZ NOT NULL,
-    "ruleEndDate" TIMESTAMPTZ,
-    exdate TIMESTAMPTZ[] DEFAULT '{}',
-    "clientOffsetHours" INTEGER NOT NULL DEFAULT 0,
+    "ruleStartDate" DATE NOT NULL,
+    "ruleEndDate" DATE,
     "currentStreak" INTEGER NOT NULL DEFAULT 0,
     "longestStreak" INTEGER NOT NULL DEFAULT 0,
-    "lastCompletedDate" TIMESTAMPTZ,
-    "lastSlipUpDate" TIMESTAMPTZ,
+    "lastEventDate" DATE,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -92,10 +88,9 @@ CREATE TABLE IF NOT EXISTS busy_bee.tracker_history (
     id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     "userId" TEXT NOT NULL DEFAULT (auth.uid()::text),
     "trackerId" TEXT NOT NULL REFERENCES busy_bee.trackers(id) ON DELETE CASCADE,
-    date TIMESTAMPTZ NOT NULL,
+    date DATE NOT NULL,
     type TEXT NOT NULL DEFAULT 'completion',
-    value NUMERIC,
-    note TEXT
+    value NUMERIC
 );
 
 -- --- ENABLE ROW LEVEL SECURITY (RLS) ---
@@ -125,6 +120,13 @@ CREATE POLICY "Users can access their own trackers" ON busy_bee.trackers
 CREATE POLICY "Users can access their own tracker_history" ON busy_bee.tracker_history
     FOR ALL USING (auth.uid()::text = "userId") WITH CHECK (auth.uid()::text = "userId");
 
+-- --- CREATE B-TREE INDEXES FOR PERFORMANCE & RLS ---
+CREATE INDEX IF NOT EXISTS idx_tracker_history_tracker_date ON busy_bee.tracker_history ("trackerId", date DESC);
+CREATE INDEX IF NOT EXISTS idx_tracker_history_user_date ON busy_bee.tracker_history ("userId", date);
+CREATE INDEX IF NOT EXISTS idx_trackers_user ON busy_bee.trackers ("userId");
+CREATE INDEX IF NOT EXISTS idx_tasks_user ON busy_bee.tasks ("userId");
+CREATE INDEX IF NOT EXISTS idx_events_user ON busy_bee.events ("userId");
+
 -- --- GRANT PRIVILEGES TO AUTHENTICATED ROLE ---
 GRANT ALL ON ALL TABLES IN SCHEMA busy_bee TO authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA busy_bee TO authenticated, service_role;
@@ -145,27 +147,33 @@ alter table busy_bee.task_history replica identity full;
 alter table busy_bee.trackers replica identity full;
 alter table busy_bee.tracker_history replica identity full;
 
--- --- TRIGGER FOR BACKFILLING MAINTAIN HABITS ON CREATION ---
+-- --- TRIGGER FOR BATCH BACKFILLING MAINTAIN HABITS ON CREATION ---
 CREATE OR REPLACE FUNCTION busy_bee.backfill_maintain_habit()
 RETURNS TRIGGER AS $$
 DECLARE
-    -- Offset the database UTC now() by the client's timezone offset to determine their true "local today"
-    current_date_ts TIMESTAMPTZ := date_trunc('day', now() + (NEW."clientOffsetHours" * interval '1 hour'));
-    start_date_ts TIMESTAMPTZ;
-    curr TIMESTAMPTZ;
+    today_date DATE := CURRENT_DATE;
+    start_date DATE := NEW."ruleStartDate";
+    days_count INT;
 BEGIN
-    IF NEW."trackerType" = 'maintain' THEN
-        start_date_ts := date_trunc('day', NEW."ruleStartDate");
-        
-        IF start_date_ts < current_date_ts THEN
-            curr := start_date_ts;
-            WHILE curr < current_date_ts LOOP
-                INSERT INTO busy_bee.tracker_history (id, "userId", "trackerId", date, type)
-                VALUES (gen_random_uuid()::text, NEW."userId", NEW.id, curr, 'completion');
-                
-                curr := curr + interval '1 day';
-            END LOOP;
-        END IF;
+    IF NEW."trackerType" = 'maintain' AND start_date < today_date THEN
+        -- Batch insert past completions in a single set operation
+        INSERT INTO busy_bee.tracker_history (id, "userId", "trackerId", date, type)
+        SELECT 
+            gen_random_uuid()::text,
+            NEW."userId",
+            NEW.id,
+            d::date,
+            'completion'
+        FROM generate_series(start_date::timestamp, (today_date - interval '1 day')::timestamp, interval '1 day') AS d;
+
+        days_count := (today_date - start_date);
+
+        UPDATE busy_bee.trackers
+        SET "currentStreak" = days_count,
+            "longestStreak" = days_count,
+            "lastEventDate" = today_date - 1,
+            "updatedAt" = now()
+        WHERE id = NEW.id;
     END IF;
     RETURN NEW;
 END;
@@ -181,30 +189,25 @@ CREATE OR REPLACE FUNCTION busy_bee.sync_tracker_streak_on_history_change()
 RETURNS TRIGGER AS $$
 DECLARE
     target_tracker_id TEXT;
-    target_user_id TEXT;
     target_type TEXT;
-    start_date_ts TIMESTAMPTZ;
-    client_offset INT;
-    local_today TIMESTAMPTZ;
-    local_yesterday TIMESTAMPTZ;
+    start_date DATE;
+    today_date DATE := CURRENT_DATE;
     rec RECORD;
     computed_streak INT := 0;
     computed_longest INT := 0;
-    last_comp TIMESTAMPTZ := NULL;
-    last_slip TIMESTAMPTZ := NULL;
+    last_comp DATE := NULL;
+    last_slip DATE := NULL;
     curr_streak INT := 0;
 BEGIN
     IF TG_OP = 'DELETE' THEN
         target_tracker_id := OLD."trackerId";
-        target_user_id := OLD."userId";
     ELSE
         target_tracker_id := NEW."trackerId";
-        target_user_id := NEW."userId";
     END IF;
 
     -- Fetch tracker metadata
-    SELECT "trackerType", "ruleStartDate", "clientOffsetHours", "longestStreak"
-    INTO target_type, start_date_ts, client_offset, computed_longest
+    SELECT "trackerType", "ruleStartDate", "longestStreak"
+    INTO target_type, start_date, computed_longest
     FROM busy_bee.trackers
     WHERE id = target_tracker_id;
 
@@ -212,21 +215,17 @@ BEGIN
         RETURN NULL;
     END IF;
 
-    -- Calculate client local today and yesterday
-    local_today := date_trunc('day', now() + (COALESCE(client_offset, 0) * interval '1 hour'));
-    local_yesterday := local_today - interval '1 day';
-
     IF target_type = 'maintain' THEN
         -- Recompute streak and longest streak from ordered completion dates
         FOR rec IN
-            SELECT DISTINCT date_trunc('day', date) AS comp_date
+            SELECT DISTINCT date AS comp_date
             FROM busy_bee.tracker_history
             WHERE "trackerId" = target_tracker_id AND type = 'completion'
             ORDER BY comp_date ASC
         LOOP
             IF last_comp IS NULL THEN
                 curr_streak := 1;
-            ELSIF rec.comp_date = last_comp + interval '1 day' THEN
+            ELSIF rec.comp_date = last_comp + 1 THEN
                 curr_streak := curr_streak + 1;
             ELSE
                 curr_streak := 1;
@@ -239,8 +238,8 @@ BEGIN
             END IF;
         END LOOP;
 
-        -- Active streak must end on today or yesterday, otherwise streak is 0
-        IF last_comp IS NOT NULL AND (last_comp = local_today OR last_comp = local_yesterday) THEN
+        -- Active streak must end on today or yesterday
+        IF last_comp IS NOT NULL AND (last_comp = today_date OR last_comp = today_date - 1) THEN
             computed_streak := curr_streak;
         ELSE
             computed_streak := 0;
@@ -249,14 +248,14 @@ BEGIN
         -- Update tracker row
         UPDATE busy_bee.trackers
         SET "currentStreak" = computed_streak,
-            "longestStreak" = GREATEST("longestStreak", computed_longest),
-            "lastCompletedDate" = last_comp,
+            "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
+            "lastEventDate" = last_comp,
             "updatedAt" = now()
         WHERE id = target_tracker_id;
 
     ELSIF target_type = 'quit' THEN
         -- Fetch most recent slip-up date
-        SELECT date_trunc('day', date)
+        SELECT date
         INTO last_slip
         FROM busy_bee.tracker_history
         WHERE "trackerId" = target_tracker_id AND type = 'slip_up'
@@ -264,15 +263,9 @@ BEGIN
         LIMIT 1;
 
         IF last_slip IS NOT NULL THEN
-            computed_streak := EXTRACT(DAY FROM (local_today - last_slip));
-            IF computed_streak < 0 THEN
-                computed_streak := 0;
-            END IF;
+            computed_streak := GREATEST(0, (today_date - last_slip));
         ELSE
-            computed_streak := EXTRACT(DAY FROM (local_today - date_trunc('day', start_date_ts)));
-            IF computed_streak < 0 THEN
-                computed_streak := 0;
-            END IF;
+            computed_streak := GREATEST(0, (today_date - start_date));
         END IF;
 
         IF computed_streak > computed_longest THEN
@@ -282,8 +275,8 @@ BEGIN
         -- Update tracker row
         UPDATE busy_bee.trackers
         SET "currentStreak" = computed_streak,
-            "longestStreak" = GREATEST("longestStreak", computed_longest),
-            "lastSlipUpDate" = last_slip,
+            "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
+            "lastEventDate" = last_slip,
             "updatedAt" = now()
         WHERE id = target_tracker_id;
     END IF;

@@ -90,28 +90,21 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
           ? _startDate.dateOnly.addDays(_durationValue!)
           : null,
       rrule: 'FREQ=DAILY', // Simplified for now
-      clientOffsetHours: DateTime.now().timeZoneOffset.inHours,
       currentStreak: isEdit ? widget.trackerToEdit!.currentStreak : 0,
       longestStreak: isEdit ? widget.trackerToEdit!.longestStreak : 0,
-      lastCompletedDate: isEdit
-          ? widget.trackerToEdit!.lastCompletedDate
-          : null,
-      lastSlipUpDate: isEdit ? widget.trackerToEdit!.lastSlipUpDate : null,
+      lastEventDate: isEdit ? widget.trackerToEdit!.lastEventDate : null,
       createdAt: isEdit ? widget.trackerToEdit!.createdAt : DateTime.now(),
       updatedAt: DateTime.now(),
     );
 
-    final controller = ref.read(
-      trackerActionControllerProvider(_trackerId).notifier,
-    );
+    final controller = ref.read(trackerActionControllerProvider.notifier);
     if (isEdit) {
       await controller.updateTracker(tracker);
     } else {
       await controller.addTracker(tracker);
     }
 
-    if (mounted &&
-        !ref.read(trackerActionControllerProvider(_trackerId)).hasError) {
+    if (mounted && !ref.read(trackerActionControllerProvider).hasError) {
       Navigator.pop(context);
     }
   }
@@ -357,7 +350,7 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
   }
 
   Widget _buildActionButtons(ColorScheme colorScheme) {
-    final asyncState = ref.watch(trackerActionControllerProvider(_trackerId));
+    final asyncState = ref.watch(trackerActionControllerProvider);
     final isLoading = asyncState.isLoading;
 
     return Wrap(

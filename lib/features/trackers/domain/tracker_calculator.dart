@@ -15,16 +15,16 @@ class TrackerCalculator {
 
     if (tracker.trackerType == 'quit') {
       final streakStart =
-          tracker.lastSlipUpDate?.dateOnly ?? tracker.ruleStartDate.dateOnly;
+          tracker.lastEventDate?.dateOnly ?? tracker.ruleStartDate.dateOnly;
       final streak = todayZero.difference(streakStart).inDays;
       return streak < 0 ? 0 : streak;
     } else {
-      if (tracker.lastCompletedDate == null) return 0;
-      final lastComp = tracker.lastCompletedDate!.dateOnly;
+      if (tracker.lastEventDate == null) return 0;
+      final lastEvent = tracker.lastEventDate!.dateOnly;
 
       // Active streak is valid only if completed today or yesterday
-      if (lastComp.isSameDay(todayZero) ||
-          lastComp.isSameDay(todayZero.previousDay)) {
+      if (lastEvent.isSameDay(todayZero) ||
+          lastEvent.isSameDay(todayZero.previousDay)) {
         return tracker.currentStreak;
       }
       return 0;
@@ -39,11 +39,18 @@ class TrackerCalculator {
     final isQuit = tracker.trackerType == 'quit';
 
     if (endDate == null) {
-      final minutesPassed = currentNow.hour * 60 + currentNow.minute;
-      const totalMinutes = 24 * 60;
       if (!isQuit) {
+        final isCompletedToday =
+            tracker.lastEventDate != null &&
+            tracker.lastEventDate!.dateOnly.isSameDay(currentNow.dateOnly);
+        if (isCompletedToday) return 1.0;
+
+        final minutesPassed = currentNow.hour * 60 + currentNow.minute;
+        const totalMinutes = 24 * 60;
         return 1.0 - (minutesPassed / totalMinutes).clamp(0.0, 1.0);
       } else {
+        final minutesPassed = currentNow.hour * 60 + currentNow.minute;
+        const totalMinutes = 24 * 60;
         return (minutesPassed / totalMinutes).clamp(0.0, 1.0);
       }
     } else {

@@ -5,7 +5,6 @@ class TrackerHistory {
   final DateTime date;
   final String type; // e.g. 'completion' or 'slip_up'
   final double? value; // Optional quantitative measure
-  final String? note;
 
   TrackerHistory({
     required this.id,
@@ -14,18 +13,21 @@ class TrackerHistory {
     required this.date,
     this.type = 'completion',
     this.value,
-    this.note,
   });
 
   factory TrackerHistory.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value) {
+      if (value is DateTime) return value.toLocal();
+      return DateTime.parse(value as String).toLocal();
+    }
+
     return TrackerHistory(
       id: json['id'] as String,
       userId: json['userId'] as String,
       trackerId: json['trackerId'] as String,
-      date: DateTime.parse(json['date'] as String),
+      date: parseDate(json['date']),
       type: json['type'] as String? ?? 'completion',
       value: json['value'] != null ? (json['value'] as num).toDouble() : null,
-      note: json['note'] as String?,
     );
   }
 
@@ -37,7 +39,6 @@ class TrackerHistory {
       'date': date.toIso8601String(),
       'type': type,
       if (value != null) 'value': value,
-      if (note != null) 'note': note,
     };
   }
 }

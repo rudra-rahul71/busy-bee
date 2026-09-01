@@ -3,6 +3,9 @@ extension DateUtilsExtension on DateTime {
   /// Returns a new [DateTime] with time components set to zero (midnight in local time).
   DateTime get dateOnly => DateTime(year, month, day);
 
+  /// Returns a normalized [DateTime] representing the 1st day of the month.
+  DateTime get monthOnly => DateTime(year, month, 1);
+
   /// Returns true if this date matches [other] in year, month, and day.
   bool isSameDay(DateTime other) =>
       year == other.year && month == other.month && day == other.day;
@@ -21,15 +24,4 @@ extension DateUtilsExtension on DateTime {
 
   /// Calendar-safe day addition.
   DateTime addDays(int days) => DateTime(year, month, day + days);
-}
-
-/// Safely parses a dynamic database value into a local [DateTime].
-DateTime? parseDateTime(dynamic value) {
-  if (value == null) return null;
-  if (value is DateTime) return value.toLocal();
-  if (value is String) {
-    final parsed = DateTime.tryParse(value);
-    return parsed?.toLocal();
-  }
-  return null;
 }
