@@ -90,7 +90,8 @@ CREATE TABLE IF NOT EXISTS busy_bee.tracker_history (
     "trackerId" TEXT NOT NULL REFERENCES busy_bee.trackers(id) ON DELETE CASCADE,
     date DATE NOT NULL,
     type TEXT NOT NULL DEFAULT 'completion',
-    value NUMERIC
+    value NUMERIC,
+    CONSTRAINT uq_tracker_history_tracker_date_type UNIQUE ("trackerId", date, type)
 );
 
 -- --- ENABLE ROW LEVEL SECURITY (RLS) ---
@@ -122,6 +123,7 @@ CREATE POLICY "Users can access their own tracker_history" ON busy_bee.tracker_h
 
 -- --- CREATE B-TREE INDEXES FOR PERFORMANCE & RLS ---
 CREATE INDEX IF NOT EXISTS idx_tracker_history_tracker_date ON busy_bee.tracker_history ("trackerId", date DESC);
+CREATE INDEX IF NOT EXISTS idx_tracker_history_lookup ON busy_bee.tracker_history ("trackerId", date, type);
 CREATE INDEX IF NOT EXISTS idx_tracker_history_user_date ON busy_bee.tracker_history ("userId", date);
 CREATE INDEX IF NOT EXISTS idx_trackers_user ON busy_bee.trackers ("userId");
 CREATE INDEX IF NOT EXISTS idx_tasks_user ON busy_bee.tasks ("userId");
@@ -153,7 +155,6 @@ RETURNS TRIGGER AS $$
 DECLARE
     today_date DATE := CURRENT_DATE;
     start_date DATE := NEW."ruleStartDate";
-    days_count INT;
 BEGIN
     IF NEW."trackerType" = 'maintain' AND start_date < today_date THEN
         -- Batch insert past completions in a single set operation
@@ -165,15 +166,6 @@ BEGIN
             d::date,
             'completion'
         FROM generate_series(start_date::timestamp, (today_date - interval '1 day')::timestamp, interval '1 day') AS d;
-
-        days_count := (today_date - start_date);
-
-        UPDATE busy_bee.trackers
-        SET "currentStreak" = days_count,
-            "longestStreak" = days_count,
-            "lastEventDate" = today_date - 1,
-            "updatedAt" = now()
-        WHERE id = NEW.id;
     END IF;
     RETURN NEW;
 END;
@@ -184,11 +176,10 @@ CREATE TRIGGER on_tracker_created_backfill
     FOR EACH ROW
     EXECUTE FUNCTION busy_bee.backfill_maintain_habit();
 
--- --- TRIGGER TO ATOMICALLY SYNCHRONIZE STREAKS ON HISTORY CHANGES ---
-CREATE OR REPLACE FUNCTION busy_bee.sync_tracker_streak_on_history_change()
-RETURNS TRIGGER AS $$
+-- --- SHARED FUNCTION TO ATOMICALLY RECALCULATE A TRACKER'S STREAK ---
+CREATE OR REPLACE FUNCTION busy_bee.recalculate_tracker_streak(p_tracker_id TEXT)
+RETURNS VOID AS $$
 DECLARE
-    target_tracker_id TEXT;
     target_type TEXT;
     start_date DATE;
     today_date DATE := CURRENT_DATE;
@@ -199,20 +190,13 @@ DECLARE
     last_slip DATE := NULL;
     curr_streak INT := 0;
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        target_tracker_id := OLD."trackerId";
-    ELSE
-        target_tracker_id := NEW."trackerId";
-    END IF;
-
-    -- Fetch tracker metadata
     SELECT "trackerType", "ruleStartDate", "longestStreak"
     INTO target_type, start_date, computed_longest
     FROM busy_bee.trackers
-    WHERE id = target_tracker_id;
+    WHERE id = p_tracker_id;
 
     IF NOT FOUND THEN
-        RETURN NULL;
+        RETURN;
     END IF;
 
     IF target_type = 'maintain' THEN
@@ -220,7 +204,7 @@ BEGIN
         FOR rec IN
             SELECT DISTINCT date AS comp_date
             FROM busy_bee.tracker_history
-            WHERE "trackerId" = target_tracker_id AND type = 'completion'
+            WHERE "trackerId" = p_tracker_id AND type = 'completion'
             ORDER BY comp_date ASC
         LOOP
             IF last_comp IS NULL THEN
@@ -245,20 +229,20 @@ BEGIN
             computed_streak := 0;
         END IF;
 
-        -- Update tracker row
+        -- Update tracker row exactly once
         UPDATE busy_bee.trackers
         SET "currentStreak" = computed_streak,
             "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
             "lastEventDate" = last_comp,
             "updatedAt" = now()
-        WHERE id = target_tracker_id;
+        WHERE id = p_tracker_id;
 
     ELSIF target_type = 'quit' THEN
         -- Fetch most recent slip-up date
         SELECT date
         INTO last_slip
         FROM busy_bee.tracker_history
-        WHERE "trackerId" = target_tracker_id AND type = 'slip_up'
+        WHERE "trackerId" = p_tracker_id AND type = 'slip_up'
         ORDER BY date DESC
         LIMIT 1;
 
@@ -272,20 +256,77 @@ BEGIN
             computed_longest := computed_streak;
         END IF;
 
-        -- Update tracker row
+        -- Update tracker row exactly once
         UPDATE busy_bee.trackers
         SET "currentStreak" = computed_streak,
             "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
             "lastEventDate" = last_slip,
             "updatedAt" = now()
-        WHERE id = target_tracker_id;
+        WHERE id = p_tracker_id;
     END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- --- STATEMENT-LEVEL TRIGGERS WITH TRANSITION TABLES (O(1) BATCH EXECUTION) ---
+
+CREATE OR REPLACE FUNCTION busy_bee.sync_streak_on_history_insert()
+RETURNS TRIGGER AS $$
+DECLARE
+    t_id TEXT;
+BEGIN
+    FOR t_id IN SELECT DISTINCT "trackerId" FROM new_table WHERE "trackerId" IS NOT NULL LOOP
+        PERFORM busy_bee.recalculate_tracker_streak(t_id);
+    END LOOP;
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
-CREATE TRIGGER on_tracker_history_sync
-    AFTER INSERT OR DELETE OR UPDATE OF date, type ON busy_bee.tracker_history
-    FOR EACH ROW
-    EXECUTE FUNCTION busy_bee.sync_tracker_streak_on_history_change();
+CREATE OR REPLACE FUNCTION busy_bee.sync_streak_on_history_update()
+RETURNS TRIGGER AS $$
+DECLARE
+    t_id TEXT;
+BEGIN
+    FOR t_id IN 
+        SELECT DISTINCT "trackerId" FROM (
+            SELECT "trackerId" FROM new_table WHERE "trackerId" IS NOT NULL
+            UNION
+            SELECT "trackerId" FROM old_table WHERE "trackerId" IS NOT NULL
+        ) AS affected
+    LOOP
+        PERFORM busy_bee.recalculate_tracker_streak(t_id);
+    END LOOP;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION busy_bee.sync_streak_on_history_delete()
+RETURNS TRIGGER AS $$
+DECLARE
+    t_id TEXT;
+BEGIN
+    FOR t_id IN SELECT DISTINCT "trackerId" FROM old_table WHERE "trackerId" IS NOT NULL LOOP
+        PERFORM busy_bee.recalculate_tracker_streak(t_id);
+    END LOOP;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_tracker_history_sync ON busy_bee.tracker_history;
+
+CREATE TRIGGER on_tracker_history_insert_sync
+    AFTER INSERT ON busy_bee.tracker_history
+    REFERENCING NEW TABLE AS new_table
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION busy_bee.sync_streak_on_history_insert();
+
+CREATE TRIGGER on_tracker_history_update_sync
+    AFTER UPDATE ON busy_bee.tracker_history
+    REFERENCING OLD TABLE AS old_table NEW TABLE AS new_table
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION busy_bee.sync_streak_on_history_update();
+
+CREATE TRIGGER on_tracker_history_delete_sync
+    AFTER DELETE ON busy_bee.tracker_history
+    REFERENCING OLD TABLE AS old_table
+    FOR EACH STATEMENT
+    EXECUTE FUNCTION busy_bee.sync_streak_on_history_delete();

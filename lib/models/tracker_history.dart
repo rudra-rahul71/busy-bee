@@ -1,3 +1,5 @@
+import '../core/utils/date_utils.dart';
+
 class TrackerHistory {
   final String id;
   final String userId;
@@ -16,16 +18,11 @@ class TrackerHistory {
   });
 
   factory TrackerHistory.fromJson(Map<String, dynamic> json) {
-    DateTime parseDate(dynamic value) {
-      if (value is DateTime) return value.toLocal();
-      return DateTime.parse(value as String).toLocal();
-    }
-
     return TrackerHistory(
       id: json['id'] as String,
       userId: json['userId'] as String,
       trackerId: json['trackerId'] as String,
-      date: parseDate(json['date']),
+      date: AppDateParser.parseDateOnly(json['date']),
       type: json['type'] as String? ?? 'completion',
       value: json['value'] != null ? (json['value'] as num).toDouble() : null,
     );
@@ -36,7 +33,7 @@ class TrackerHistory {
       'id': id,
       'userId': userId,
       'trackerId': trackerId,
-      'date': date.toIso8601String(),
+      'date': AppDateParser.formatDateOnly(date),
       'type': type,
       if (value != null) 'value': value,
     };

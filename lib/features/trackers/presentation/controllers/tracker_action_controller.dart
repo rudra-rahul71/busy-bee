@@ -3,47 +3,78 @@ import 'dart:async';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../../../../models/tracker.dart';
-import '../../../../models/tracker_history.dart';
 import '../../data/tracker_providers.dart';
 
+/// Scoped controller per [trackerId] so UI actions on one card don't lock or trigger errors on others.
 class TrackerActionController extends AsyncNotifier<void> {
+  final String trackerId;
+
+  TrackerActionController(this.trackerId);
+
   @override
   FutureOr<void> build() {}
 
-  Future<void> addTracker(Tracker tracker) async {
+  Future<void> logCompletion(DateTime date, {double? value}) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final collection = ref.read(trackerCollectionProvider);
-      await collection.save(tracker, tracker.id);
+      final repository = ref.read(trackerRepositoryProvider);
+      await repository.logCompletion(
+        trackerId: trackerId,
+        date: date,
+        value: value,
+      );
+    });
+  }
+
+  Future<void> logSlipUp(DateTime date, {double? value}) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(trackerRepositoryProvider);
+      await repository.logSlipUp(
+        trackerId: trackerId,
+        date: date,
+        value: value,
+      );
+    });
+  }
+
+  Future<void> deleteTracker() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(trackerRepositoryProvider);
+      await repository.deleteTracker(trackerId);
+    });
+  }
+}
+
+final trackerActionControllerProvider =
+    AsyncNotifierProvider.family<TrackerActionController, void, String>(
+      TrackerActionController.new,
+    );
+
+/// Form controller for tracker creation and updates.
+class TrackerFormController extends AsyncNotifier<void> {
+  @override
+  FutureOr<void> build() {}
+
+  Future<void> createTracker(Tracker tracker) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final repository = ref.read(trackerRepositoryProvider);
+      await repository.createTracker(tracker);
     });
   }
 
   Future<void> updateTracker(Tracker tracker) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
-      final collection = ref.read(trackerCollectionProvider);
-      await collection.save(tracker, tracker.id);
-    });
-  }
-
-  Future<void> deleteTracker(String id) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final collection = ref.read(trackerCollectionProvider);
-      await collection.delete(id);
-    });
-  }
-
-  Future<void> logHistory(TrackerHistory history) async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final collection = ref.read(trackerHistoryCollectionProvider);
-      await collection.save(history, history.id);
+      final repository = ref.read(trackerRepositoryProvider);
+      await repository.updateTracker(tracker);
     });
   }
 }
 
-final trackerActionControllerProvider =
-    AsyncNotifierProvider<TrackerActionController, void>(
-      TrackerActionController.new,
+final trackerFormControllerProvider =
+    AsyncNotifierProvider<TrackerFormController, void>(
+      TrackerFormController.new,
     );

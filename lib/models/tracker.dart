@@ -1,3 +1,5 @@
+import '../core/utils/date_utils.dart';
+
 class Tracker {
   final String id;
   final String userId;
@@ -58,26 +60,19 @@ class Tracker {
   }
 
   factory Tracker.fromJson(Map<String, dynamic> json) {
-    DateTime? parseDate(dynamic value) {
-      if (value == null) return null;
-      if (value is DateTime) return value.toLocal();
-      if (value is String) return DateTime.parse(value).toLocal();
-      return null;
-    }
-
     return Tracker(
       id: json['id'] as String,
       userId: json['userId'] as String,
       summary: json['summary'] as String,
       trackerType: json['trackerType'] as String,
       rrule: json['rrule'] as String?,
-      ruleStartDate: parseDate(json['ruleStartDate']) ?? DateTime.now(),
-      ruleEndDate: parseDate(json['ruleEndDate']),
+      ruleStartDate: AppDateParser.parseDateOnly(json['ruleStartDate']),
+      ruleEndDate: AppDateParser.parseNullableDateOnly(json['ruleEndDate']),
       currentStreak: json['currentStreak'] as int? ?? 0,
       longestStreak: json['longestStreak'] as int? ?? 0,
-      lastEventDate: parseDate(json['lastEventDate']),
-      createdAt: parseDate(json['createdAt']) ?? DateTime.now(),
-      updatedAt: parseDate(json['updatedAt']) ?? DateTime.now(),
+      lastEventDate: AppDateParser.parseNullableDateOnly(json['lastEventDate']),
+      createdAt: AppDateParser.parseDateTime(json['createdAt']),
+      updatedAt: AppDateParser.parseDateTime(json['updatedAt']),
     );
   }
 
@@ -88,14 +83,15 @@ class Tracker {
       'summary': summary,
       'trackerType': trackerType,
       'rrule': rrule,
-      'ruleStartDate': ruleStartDate.toIso8601String(),
-      'ruleEndDate': ruleEndDate?.toIso8601String(),
+      'ruleStartDate': AppDateParser.formatDateOnly(ruleStartDate),
+      if (ruleEndDate != null)
+        'ruleEndDate': AppDateParser.formatDateOnly(ruleEndDate!),
       'currentStreak': currentStreak,
       'longestStreak': longestStreak,
       if (lastEventDate != null)
-        'lastEventDate': lastEventDate!.toIso8601String(),
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
+        'lastEventDate': AppDateParser.formatDateOnly(lastEventDate!),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      'updatedAt': updatedAt.toUtc().toIso8601String(),
     };
   }
 }

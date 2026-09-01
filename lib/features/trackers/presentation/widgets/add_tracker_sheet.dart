@@ -97,14 +97,14 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
       updatedAt: DateTime.now(),
     );
 
-    final controller = ref.read(trackerActionControllerProvider.notifier);
+    final controller = ref.read(trackerFormControllerProvider.notifier);
     if (isEdit) {
       await controller.updateTracker(tracker);
     } else {
-      await controller.addTracker(tracker);
+      await controller.createTracker(tracker);
     }
 
-    if (mounted && !ref.read(trackerActionControllerProvider).hasError) {
+    if (mounted && !ref.read(trackerFormControllerProvider).hasError) {
       Navigator.pop(context);
     }
   }
@@ -350,7 +350,7 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
   }
 
   Widget _buildActionButtons(ColorScheme colorScheme) {
-    final asyncState = ref.watch(trackerActionControllerProvider);
+    final asyncState = ref.watch(trackerFormControllerProvider);
     final isLoading = asyncState.isLoading;
 
     return Wrap(

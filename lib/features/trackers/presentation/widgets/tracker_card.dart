@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import 'package:dynamic_backend_bridge/dynamic_backend_bridge.dart';
 
 import '../../../../core/utils/date_utils.dart';
 import '../../../../models/tracker.dart';
-import '../../../../models/tracker_history.dart';
 import '../../domain/tracker_calculator.dart';
 import '../controllers/tracker_action_controller.dart';
 import 'add_tracker_sheet.dart';
@@ -48,8 +46,8 @@ class TrackerCard extends ConsumerWidget {
             onPressed: () {
               Navigator.pop(context);
               ref
-                  .read(trackerActionControllerProvider.notifier)
-                  .deleteTracker(tracker.id);
+                  .read(trackerActionControllerProvider(tracker.id).notifier)
+                  .deleteTracker();
             },
             child: const Text('Delete'),
           ),
@@ -66,7 +64,10 @@ class TrackerCard extends ConsumerWidget {
 
     final now = DateTime.now();
 
-    ref.listen<AsyncValue<void>>(trackerActionControllerProvider, (_, state) {
+    ref.listen<AsyncValue<void>>(trackerActionControllerProvider(tracker.id), (
+      _,
+      state,
+    ) {
       if (!state.isLoading && state.hasError) {
         AppBannerService.showError(
           context,
@@ -76,7 +77,7 @@ class TrackerCard extends ConsumerWidget {
       }
     });
 
-    final actionState = ref.watch(trackerActionControllerProvider);
+    final actionState = ref.watch(trackerActionControllerProvider(tracker.id));
     final isLoading = actionState.isLoading;
 
     // Fast-path O(1) status and streak retrieval via counter caches
@@ -280,16 +281,12 @@ class TrackerCard extends ConsumerWidget {
                   onPressed: (isLoading || isCompletedToday)
                       ? null
                       : () {
-                          final newHistory = TrackerHistory(
-                            id: const Uuid().v4(),
-                            userId: tracker.userId,
-                            trackerId: tracker.id,
-                            date: now.dateOnly,
-                            type: 'completion',
-                          );
                           ref
-                              .read(trackerActionControllerProvider.notifier)
-                              .logHistory(newHistory);
+                              .read(
+                                trackerActionControllerProvider(tracker.id)
+                                    .notifier,
+                              )
+                              .logCompletion(now);
 
                           AppBannerService.showSuccess(
                             context,
@@ -365,16 +362,12 @@ class TrackerCard extends ConsumerWidget {
                   onPressed: (isLoading || isSlippedToday)
                       ? null
                       : () {
-                          final newHistory = TrackerHistory(
-                            id: const Uuid().v4(),
-                            userId: tracker.userId,
-                            trackerId: tracker.id,
-                            date: now.dateOnly,
-                            type: 'slip_up',
-                          );
                           ref
-                              .read(trackerActionControllerProvider.notifier)
-                              .logHistory(newHistory);
+                              .read(
+                                trackerActionControllerProvider(tracker.id)
+                                    .notifier,
+                              )
+                              .logSlipUp(now);
 
                           AppBannerService.showSuccess(
                             context,

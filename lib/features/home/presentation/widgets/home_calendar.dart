@@ -103,7 +103,10 @@ class HomeCalendar extends StatelessWidget {
                 final count = showMore ? displayLimit - 1 : tasks.length;
 
                 for (int i = 0; i < count; i++) {
-                  final e = tasks[i];
+                  final task = tasks[i];
+                  final isCompleted = task.status == 'COMPLETED';
+                  final taskColor = colorScheme.primary;
+
                   taskMarkers.add(
                     Container(
                       margin: const EdgeInsets.only(
@@ -117,22 +120,22 @@ class HomeCalendar extends StatelessWidget {
                       ),
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: e['isCompleted']
-                            ? e['color'].withValues(alpha: 0.8)
-                            : e['color'].withValues(alpha: 0.2),
+                        color: isCompleted
+                            ? taskColor.withValues(alpha: 0.8)
+                            : taskColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
-                        border: e['isCompleted']
+                        border: isCompleted
                             ? null
                             : Border.all(
-                                color: e['color'].withValues(alpha: 0.5),
+                                color: taskColor.withValues(alpha: 0.5),
                               ),
                       ),
                       child: Text(
-                        e['name'],
+                        task.summary,
                         style: TextStyle(
                           fontSize: 8.0,
                           fontWeight: FontWeight.bold,
-                          color: e['isCompleted'] ? Colors.white : e['color'],
+                          color: isCompleted ? Colors.white : taskColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

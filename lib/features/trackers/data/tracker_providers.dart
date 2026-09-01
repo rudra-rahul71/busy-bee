@@ -4,6 +4,8 @@ import 'package:dynamic_backend_bridge/dynamic_backend_bridge.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../models/tracker.dart';
 import '../../../../models/tracker_history.dart';
+import '../domain/repositories/tracker_repository.dart';
+import 'repositories/tracker_repository_impl.dart';
 
 final trackerCollectionProvider = Provider<TypedCollection<Tracker>>((ref) {
   final dbRepo = ref.watch(databaseRepositoryProvider);
@@ -13,11 +15,6 @@ final trackerCollectionProvider = Provider<TypedCollection<Tracker>>((ref) {
     toMap: (tracker) => tracker.toJson(),
     fromMap: (map, id) => Tracker.fromJson({...map, 'id': id}),
   );
-});
-
-final trackersStreamProvider = StreamProvider<List<Tracker>>((ref) {
-  final collection = ref.watch(trackerCollectionProvider);
-  return collection.watch();
 });
 
 final trackerHistoryCollectionProvider =
@@ -31,28 +28,27 @@ final trackerHistoryCollectionProvider =
       );
     });
 
+/// Provides the singleton [TrackerRepository] instance.
+final trackerRepositoryProvider = Provider<TrackerRepository>((ref) {
+  return TrackerRepositoryImpl(
+    trackerCollection: ref.watch(trackerCollectionProvider),
+    trackerHistoryCollection: ref.watch(trackerHistoryCollectionProvider),
+    authRepository: ref.watch(authRepositoryProvider),
+  );
+});
+
+/// Live stream of all trackers for the current user.
+final trackersStreamProvider = StreamProvider<List<Tracker>>((ref) {
+  final repository = ref.watch(trackerRepositoryProvider);
+  return repository.watchTrackers();
+});
+
 /// Bounded window stream provider for calendar and history visualization.
 /// Captures the specified month plus the previous week and next week to catch calendar overflow.
 final calendarTrackerHistoryStreamProvider =
     StreamProvider.family<List<TrackerHistory>, DateTime>((ref, monthDate) {
-      final collection = ref.watch(trackerHistoryCollectionProvider);
-      final normalizedMonth = monthDate.monthOnly;
-      final startOfWindow = normalizedMonth.subtract(const Duration(days: 7));
-      final endOfWindow = DateTime(
-        normalizedMonth.year,
-        normalizedMonth.month + 1,
-        0,
-        23,
-        59,
-        59,
-      ).add(const Duration(days: 7));
-
-      return collection.watch(
-        filters: [
-          QueryFilter.gte('date', startOfWindow),
-          QueryFilter.lte('date', endOfWindow),
-        ],
-      );
+      final repository = ref.watch(trackerRepositoryProvider);
+      return repository.watchTrackerHistoryWindow(monthDate);
     });
 
 /// Pre-indexes tracker history grouped by trackerId in memory for the bounded calendar window.

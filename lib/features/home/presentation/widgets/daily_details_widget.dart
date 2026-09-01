@@ -109,9 +109,7 @@ class DailyDetailsWidget extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          ...dayData.tasks.map(
-            (t) => ListTile(title: Text(t['name'] ?? 'Task')),
-          ),
+          ...dayData.tasks.map((t) => ListTile(title: Text(t.summary))),
 
           if (hasTrackers)
             Divider(
