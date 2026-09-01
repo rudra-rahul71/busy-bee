@@ -160,6 +160,7 @@ class _TrackersPageState extends ConsumerState<TrackersPage> {
         return ChoiceChip(
           label: Text(label),
           selected: isSelected,
+          showCheckmark: false,
           onSelected: (selected) {
             if (selected) setState(() => _activeFilter = filter);
           },
