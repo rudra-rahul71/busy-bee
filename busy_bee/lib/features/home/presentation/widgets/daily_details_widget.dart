@@ -13,6 +13,7 @@ class DailyDetailsWidget extends ConsumerWidget {
   final DayData dayData;
   final bool isScrollable;
   final ScrollController? scrollController;
+  final bool asCard;
 
   const DailyDetailsWidget({
     super.key,
@@ -20,6 +21,7 @@ class DailyDetailsWidget extends ConsumerWidget {
     required this.dayData,
     this.isScrollable = true,
     this.scrollController,
+    this.asCard = true,
   });
 
   @override
@@ -173,6 +175,67 @@ class DailyDetailsWidget extends ConsumerWidget {
       ],
     );
 
+    final headerWidget = Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formattedDate,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Habits & tasks completion details',
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!asCard)
+          IconButton(
+            icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
+            onPressed: () => Navigator.pop(context),
+          ),
+      ],
+    );
+
+    final content = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        headerWidget,
+        Divider(
+          height: 32,
+          thickness: 1,
+          color: colorScheme.onSurface.withValues(alpha: 0.1),
+        ),
+        if (isScrollable)
+          Expanded(
+            child: SingleChildScrollView(
+              controller: scrollController,
+              physics: const BouncingScrollPhysics(),
+              child: listWidget,
+            ),
+          )
+        else
+          listWidget,
+      ],
+    );
+
+    if (!asCard) {
+      return content;
+    }
+
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -186,43 +249,7 @@ class DailyDetailsWidget extends ConsumerWidget {
       margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              formattedDate,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Habits & tasks completion details',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 13,
-              ),
-            ),
-            Divider(
-              height: 32,
-              thickness: 1,
-              color: colorScheme.onSurface.withValues(alpha: 0.1),
-            ),
-
-            if (isScrollable)
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  physics: const BouncingScrollPhysics(),
-                  child: listWidget,
-                ),
-              )
-            else
-              listWidget,
-          ],
-        ),
+        child: content,
       ),
     );
   }

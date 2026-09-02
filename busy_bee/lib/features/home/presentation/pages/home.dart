@@ -38,27 +38,33 @@ class _HomePageState extends ConsumerState<HomePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.5,
-          minChildSize: 0.3,
-          maxChildSize: 0.9,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
+      builder: (sheetContext) {
+        final colorScheme = Theme.of(sheetContext).colorScheme;
+        final bottomInset = MediaQuery.of(sheetContext).viewInsets.bottom;
+
+        return Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(20),
+            ),
+          ),
+          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + bottomInset),
+          child: SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+              ),
+              child: SingleChildScrollView(
+                child: DailyDetailsWidget(
+                  selectedDay: day,
+                  dayData: data,
+                  isScrollable: false,
+                  asCard: false,
                 ),
               ),
-              child: DailyDetailsWidget(
-                selectedDay: day,
-                dayData: data,
-                isScrollable: true,
-                scrollController: scrollController,
-              ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -78,83 +84,98 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
 
     return Scaffold(
-      body: Column(
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(24.0),
-            child: PageHeader(
-              header: 'Busy Bee',
-              sub: 'Manage your daily tasks and events',
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isLargeScreen = constraints.maxWidth >= 850;
-                final dayEvents = _selectedDay != null
-                    ? _getEventsForDay(_selectedDay!)
-                    : [];
-                final dayData = dayEvents.isNotEmpty
-                    ? dayEvents.first
-                    : const DayData();
+      backgroundColor: Colors.transparent,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isLargeScreen = constraints.maxWidth >= 850;
+          const minHeight = 440.0;
+          const headerAndPaddingHeight = 128.0;
+          final availableHeight = constraints.maxHeight - headerAndPaddingHeight;
+          final targetHeight =
+              availableHeight > minHeight ? availableHeight : minHeight;
 
-                final calendarWidget = HomeCalendar(
-                  focusedDay: _focusedDay,
-                  selectedDay: _selectedDay,
-                  trackerHistoryMap: trackerHistoryMap,
-                  margin: isLargeScreen
-                      ? EdgeInsets.zero
-                      : const EdgeInsets.all(16.0),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDay = selectedDay;
-                      _focusedDay = focusedDay;
-                    });
+          final dayEvents = _selectedDay != null
+              ? _getEventsForDay(_selectedDay!)
+              : [];
+          final dayData =
+              dayEvents.isNotEmpty ? dayEvents.first : const DayData();
 
-                    if (!isLargeScreen) {
-                      final events = _getEventsForDay(selectedDay);
-                      final data = events.isNotEmpty
-                          ? events.first
-                          : const DayData();
-                      _showMobileBottomSheet(context, selectedDay, data);
-                    }
-                  },
-                  onPageChanged: (focusedDay) {
-                    setState(() {
-                      _focusedDay = focusedDay;
-                    });
-                  },
-                  eventLoader: _getEventsForDay,
-                );
+          final calendarWidget = HomeCalendar(
+            focusedDay: _focusedDay,
+            selectedDay: _selectedDay,
+            trackerHistoryMap: trackerHistoryMap,
+            margin: EdgeInsets.zero,
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDay = selectedDay;
+                _focusedDay = focusedDay;
+              });
 
-                if (isLargeScreen) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0,
-                      vertical: 8.0,
+              if (!isLargeScreen) {
+                final events = _getEventsForDay(selectedDay);
+                final data =
+                    events.isNotEmpty ? events.first : const DayData();
+                _showMobileBottomSheet(context, selectedDay, data);
+              }
+            },
+            onPageChanged: (focusedDay) {
+              setState(() {
+                _focusedDay = focusedDay;
+              });
+            },
+            eventLoader: _getEventsForDay,
+          );
+
+          Widget contentWidget;
+          if (isLargeScreen) {
+            contentWidget = SizedBox(
+              height: targetHeight,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: DailyDetailsWidget(
+                      selectedDay: _selectedDay ?? _focusedDay,
+                      dayData: dayData,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: DailyDetailsWidget(
-                            selectedDay: _selectedDay ?? _focusedDay,
-                            dayData: dayData,
-                          ),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(flex: 4, child: calendarWidget),
-                      ],
-                    ),
-                  );
-                } else {
-                  return calendarWidget;
-                }
-              },
-            ),
-          ),
-        ],
+                  ),
+                  const SizedBox(width: 24),
+                  Expanded(flex: 4, child: calendarWidget),
+                ],
+              ),
+            );
+          } else {
+            contentWidget = SizedBox(
+              height: targetHeight,
+              child: calendarWidget,
+            );
+          }
+
+          return CustomScrollView(
+            slivers: [
+              const SliverPadding(
+                padding: EdgeInsets.all(24.0),
+                sliver: SliverToBoxAdapter(
+                  child: PageHeader(
+                    header: 'Busy Bee',
+                    sub: 'Manage your daily tasks and events',
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.only(
+                  left: 24.0,
+                  right: 24.0,
+                  bottom: 24.0,
+                ),
+                sliver: SliverToBoxAdapter(
+                  child: contentWidget,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

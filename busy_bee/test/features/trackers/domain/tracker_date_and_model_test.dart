@@ -4,6 +4,7 @@ import 'package:busy_bee/models/tracker.dart';
 import 'package:busy_bee/models/tracker_history.dart';
 import 'package:busy_bee/models/task.dart';
 import 'package:busy_bee/features/home/domain/models/day_data.dart';
+import 'package:busy_bee/features/trackers/domain/tracker_calculator.dart';
 
 void main() {
   group('AppDateParser & DateUtilsExtension Tests', () {
@@ -88,6 +89,98 @@ void main() {
       final dayData = DayData(tasks: [task], trackers: []);
       expect(dayData.tasks.first.summary, equals('Review Code'));
       expect(dayData.tasks.first.status, equals('COMPLETED'));
+    });
+  });
+
+  group('TrackerCalculator.getFormattedStreak Tests', () {
+    test(
+      'returns "Last Day!" when 0 days remaining on a set duration card',
+      () {
+        final tracker = Tracker(
+          id: 't-1',
+          userId: 'u-1',
+          summary: '30-day Challenge',
+          trackerType: 'maintain',
+          ruleStartDate: DateTime(2026, 8, 3),
+          ruleEndDate: DateTime(2026, 9, 2),
+          createdAt: DateTime(2026, 8, 3),
+          updatedAt: DateTime(2026, 8, 3),
+        );
+
+        final now = DateTime(2026, 9, 2, 14, 30);
+        final text = TrackerCalculator.getFormattedStreak(
+          tracker: tracker,
+          now: now,
+        );
+        expect(text, equals('Last Day!'));
+      },
+    );
+
+    test(
+      'returns remaining days when > 0 days remaining on a set duration card',
+      () {
+        final tracker = Tracker(
+          id: 't-2',
+          userId: 'u-1',
+          summary: '30-day Challenge',
+          trackerType: 'maintain',
+          ruleStartDate: DateTime(2026, 8, 3),
+          ruleEndDate: DateTime(2026, 9, 5),
+          createdAt: DateTime(2026, 8, 3),
+          updatedAt: DateTime(2026, 8, 3),
+        );
+
+        final now = DateTime(2026, 9, 2, 10, 0);
+        final text = TrackerCalculator.getFormattedStreak(
+          tracker: tracker,
+          now: now,
+        );
+        expect(text, equals('3 days remaining'));
+      },
+    );
+
+    test(
+      'returns "1 day remaining" when 1 day left on a set duration card',
+      () {
+        final tracker = Tracker(
+          id: 't-3',
+          userId: 'u-1',
+          summary: '30-day Challenge',
+          trackerType: 'maintain',
+          ruleStartDate: DateTime(2026, 8, 3),
+          ruleEndDate: DateTime(2026, 9, 3),
+          createdAt: DateTime(2026, 8, 3),
+          updatedAt: DateTime(2026, 8, 3),
+        );
+
+        final now = DateTime(2026, 9, 2, 22, 0);
+        final text = TrackerCalculator.getFormattedStreak(
+          tracker: tracker,
+          now: now,
+        );
+        expect(text, equals('1 day remaining'));
+      },
+    );
+
+    test('returns streak for indefinite cards (ruleEndDate == null)', () {
+      final tracker = Tracker(
+        id: 't-4',
+        userId: 'u-1',
+        summary: 'Daily Meditation',
+        trackerType: 'maintain',
+        ruleStartDate: DateTime(2026, 8, 1),
+        currentStreak: 5,
+        lastEventDate: DateTime(2026, 9, 2),
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 1),
+      );
+
+      final now = DateTime(2026, 9, 2);
+      final text = TrackerCalculator.getFormattedStreak(
+        tracker: tracker,
+        now: now,
+      );
+      expect(text, equals('5 days'));
     });
   });
 }

@@ -74,6 +74,9 @@ class TrackerCalculator {
     } else {
       final daysRemaining = endDate.difference(currentNow).inDays;
       final remValue = daysRemaining < 0 ? 0 : daysRemaining;
+      if (remValue == 0) {
+        return 'Last Day!';
+      }
       return '$remValue day${remValue == 1 ? '' : 's'} remaining';
     }
   }
