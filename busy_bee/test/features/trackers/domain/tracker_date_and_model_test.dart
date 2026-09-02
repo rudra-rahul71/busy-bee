@@ -125,7 +125,7 @@ void main() {
           summary: '30-day Challenge',
           trackerType: 'maintain',
           ruleStartDate: DateTime(2026, 8, 3),
-          ruleEndDate: DateTime(2026, 9, 5),
+          ruleEndDate: DateTime(2026, 9, 6),
           createdAt: DateTime(2026, 8, 3),
           updatedAt: DateTime(2026, 8, 3),
         );
@@ -153,7 +153,7 @@ void main() {
           updatedAt: DateTime(2026, 8, 3),
         );
 
-        final now = DateTime(2026, 9, 2, 22, 0);
+        final now = DateTime(2026, 9, 1, 10, 0);
         final text = TrackerCalculator.getFormattedStreak(
           tracker: tracker,
           now: now,
