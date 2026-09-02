@@ -47,7 +47,7 @@ jobs:
       - name: Start iOS Simulator
         uses: futureware-tech/simulator-action@v3
         with:
-          model: 'iPhone 15'
+          model: 'iPhone 14'
           
       - name: Run E2E Integration Test (iOS)
         working-directory: ./busy_bee
