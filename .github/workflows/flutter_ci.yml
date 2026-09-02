@@ -45,10 +45,13 @@ jobs:
         run: flutter build macos --debug
 
       - name: Start iOS Simulator
-        uses: futureware-tech/simulator-action@v3
-        with:
-          model: 'iPhone 16 Pro'
-          
+        run: |
+          DEVICE_UUID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone' | grep -oE '[0-9A-F-]{36}')
+          echo "Found simulator UUID: $DEVICE_UUID"
+          echo "SIMULATOR_UUID=$DEVICE_UUID" >> $GITHUB_ENV
+          xcrun simctl boot "$DEVICE_UUID" || true
+          xcrun simctl bootstatus "$DEVICE_UUID" -b
+
       - name: Run E2E Integration Test (iOS)
         working-directory: ./busy_bee
-        run: flutter test integration_test/app_test.dart
+        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID"
