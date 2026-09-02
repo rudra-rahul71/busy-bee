@@ -204,7 +204,7 @@ packages:
   dynamic_backend_bridge:
     dependency: "direct main"
     description:
-      path: "../dynamic_backend_bridge"
+      path: "../../dynamic_backend_bridge"
       relative: true
     source: path
     version: "0.0.6"
