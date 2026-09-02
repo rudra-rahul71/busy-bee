@@ -49,7 +49,7 @@ Future<void> initializeBackend(
   );
 }
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Try to init firebase, ignore if missing config
