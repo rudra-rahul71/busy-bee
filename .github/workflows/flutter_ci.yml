@@ -1,0 +1,54 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
+      - name: Analyze project source
+        working-directory: ./busy_bee
+        run: flutter analyze
+
+      - name: Run unit and widget tests
+        working-directory: ./busy_bee
+        run: flutter test
+
+      - name: Build Android APK
+        working-directory: ./busy_bee
+        run: flutter build apk --debug
+
+      - name: Build iOS (No Codesign)
+        working-directory: ./busy_bee
+        run: flutter build ios --no-codesign --debug
+
+      - name: Build macOS
+        working-directory: ./busy_bee
+        run: flutter build macos --debug
+
+      - name: Start iOS Simulator
+        uses: futureware-tech/simulator-action@v3
+        with:
+          model: 'iPhone 15'
+          
+      - name: Run E2E Integration Test (iOS)
+        working-directory: ./busy_bee
+        run: flutter test integration_test/app_test.dart
