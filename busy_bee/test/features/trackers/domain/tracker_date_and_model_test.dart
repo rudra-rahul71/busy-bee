@@ -37,7 +37,6 @@ void main() {
         'ruleStartDate': '2026-09-01',
         'ruleEndDate': '2026-10-01',
         'currentStreak': 5,
-        'longestStreak': 10,
         'lastEventDate': '2026-09-01',
         'createdAt': '2026-09-01T00:00:00.000Z',
         'updatedAt': '2026-09-01T00:00:00.000Z',
@@ -53,7 +52,27 @@ void main() {
       final serialized = tracker.toJson();
       expect(serialized['ruleStartDate'], equals('2026-09-01'));
       expect(serialized['ruleEndDate'], equals('2026-10-01'));
-      expect(serialized['lastEventDate'], equals('2026-09-01'));
+      expect(serialized.containsKey('lastEventDate'), isFalse);
+      expect(serialized.containsKey('longestStreak'), isFalse);
+    });
+
+    test('Tracker serializes ruleEndDate as null when indefinite and omits lastEventDate', () {
+      final tracker = Tracker(
+        id: 'tracker-indefinite',
+        userId: 'user-abc',
+        summary: 'Indefinite Meditation',
+        trackerType: 'maintain',
+        ruleStartDate: DateTime(2026, 9, 1),
+        ruleEndDate: null,
+        lastEventDate: null,
+        createdAt: DateTime(2026, 9, 1),
+        updatedAt: DateTime(2026, 9, 1),
+      );
+
+      final serialized = tracker.toJson();
+      expect(serialized.containsKey('ruleEndDate'), isTrue);
+      expect(serialized['ruleEndDate'], isNull);
+      expect(serialized.containsKey('lastEventDate'), isFalse);
     });
 
     test('TrackerHistory serializes date as pure YYYY-MM-DD', () {
@@ -181,6 +200,123 @@ void main() {
         now: now,
       );
       expect(text, equals('5 days'));
+    });
+  });
+
+  group('TrackerCalculator.calculateStreak Tests', () {
+    test('quit tracker created today with no slip-up shows streak of 1', () {
+      final tracker = Tracker(
+        id: 'q-today',
+        userId: 'u-1',
+        summary: 'Quit Soda',
+        trackerType: 'quit',
+        ruleStartDate: DateTime(2026, 9, 2),
+        lastEventDate: null,
+        createdAt: DateTime(2026, 9, 2),
+        updatedAt: DateTime(2026, 9, 2),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 10, 0),
+      );
+      expect(streak, equals(1));
+    });
+
+    test('quit tracker created 8 days ago with no slip-up calculates 9 clean days', () {
+      final tracker = Tracker(
+        id: 'q-1',
+        userId: 'u-1',
+        summary: 'Quit Sugar',
+        trackerType: 'quit',
+        ruleStartDate: DateTime(2026, 8, 25),
+        lastEventDate: null,
+        createdAt: DateTime(2026, 8, 25),
+        updatedAt: DateTime(2026, 8, 25),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 10, 0),
+      );
+      expect(streak, equals(9));
+    });
+
+    test('quit tracker created yesterday with no slip-up shows streak of 2', () {
+      final tracker = Tracker(
+        id: 'q-2',
+        userId: 'u-1',
+        summary: 'Quit Smoking',
+        trackerType: 'quit',
+        ruleStartDate: DateTime(2026, 9, 1),
+        lastEventDate: null,
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 9, 1),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 14, 0),
+      );
+      expect(streak, equals(2));
+    });
+
+    test('quit tracker with slip-up today resets streak to 0', () {
+      final tracker = Tracker(
+        id: 'q-slipped-today',
+        userId: 'u-1',
+        summary: 'Quit Vaping',
+        trackerType: 'quit',
+        ruleStartDate: DateTime(2026, 8, 1),
+        lastEventDate: DateTime(2026, 9, 2),
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 9, 2),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 12, 0),
+      );
+      expect(streak, equals(0));
+    });
+
+    test('quit tracker with slip-up calculates clean days after slip-up', () {
+      final tracker = Tracker(
+        id: 'q-3',
+        userId: 'u-1',
+        summary: 'Quit Coffee',
+        trackerType: 'quit',
+        ruleStartDate: DateTime(2026, 8, 1),
+        lastEventDate: DateTime(2026, 8, 30),
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 30),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 12, 0),
+      );
+      expect(streak, equals(3));
+    });
+
+    test('maintain tracker expires (evaluates to 0) if lastEventDate is older than yesterday', () {
+      final tracker = Tracker(
+        id: 'm-1',
+        userId: 'u-1',
+        summary: 'Daily Pushups',
+        trackerType: 'maintain',
+        ruleStartDate: DateTime(2026, 8, 1),
+        currentStreak: 10,
+        lastEventDate: DateTime(2026, 8, 30), // 3 days ago relative to 2026-09-02
+        createdAt: DateTime(2026, 8, 1),
+        updatedAt: DateTime(2026, 8, 30),
+      );
+
+      final streak = TrackerCalculator.calculateStreak(
+        tracker: tracker,
+        now: DateTime(2026, 9, 2, 9, 0),
+      );
+      expect(streak, equals(0));
     });
   });
 }
