@@ -77,7 +77,6 @@ CREATE TABLE IF NOT EXISTS busy_bee.trackers (
     "ruleStartDate" DATE NOT NULL,
     "ruleEndDate" DATE,
     "currentStreak" INTEGER NOT NULL DEFAULT 0,
-    "longestStreak" INTEGER NOT NULL DEFAULT 0,
     "lastEventDate" DATE,
     "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -149,32 +148,22 @@ alter table busy_bee.task_history replica identity full;
 alter table busy_bee.trackers replica identity full;
 alter table busy_bee.tracker_history replica identity full;
 
--- --- TRIGGER FOR BATCH BACKFILLING MAINTAIN HABITS ON CREATION ---
-CREATE OR REPLACE FUNCTION busy_bee.backfill_maintain_habit()
+-- --- VALIDATION TRIGGER: PREVENT FUTURE START DATES ---
+CREATE OR REPLACE FUNCTION busy_bee.validate_tracker_dates()
 RETURNS TRIGGER AS $$
-DECLARE
-    today_date DATE := CURRENT_DATE;
-    start_date DATE := NEW."ruleStartDate";
 BEGIN
-    IF NEW."trackerType" = 'maintain' AND start_date < today_date THEN
-        -- Batch insert past completions in a single set operation
-        INSERT INTO busy_bee.tracker_history (id, "userId", "trackerId", date, type)
-        SELECT 
-            gen_random_uuid()::text,
-            NEW."userId",
-            NEW.id,
-            d::date,
-            'completion'
-        FROM generate_series(start_date::timestamp, (today_date - interval '1 day')::timestamp, interval '1 day') AS d;
+    IF NEW."ruleStartDate" > CURRENT_DATE THEN
+        RAISE EXCEPTION 'ruleStartDate cannot be in the future (ruleStartDate: %, CURRENT_DATE: %)', NEW."ruleStartDate", CURRENT_DATE;
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
-CREATE TRIGGER on_tracker_created_backfill
-    AFTER INSERT ON busy_bee.trackers
+DROP TRIGGER IF EXISTS check_tracker_dates_before_save ON busy_bee.trackers;
+CREATE TRIGGER check_tracker_dates_before_save
+    BEFORE INSERT OR UPDATE OF "ruleStartDate" ON busy_bee.trackers
     FOR EACH ROW
-    EXECUTE FUNCTION busy_bee.backfill_maintain_habit();
+    EXECUTE FUNCTION busy_bee.validate_tracker_dates();
 
 -- --- SHARED FUNCTION TO ATOMICALLY RECALCULATE A TRACKER'S STREAK ---
 CREATE OR REPLACE FUNCTION busy_bee.recalculate_tracker_streak(p_tracker_id TEXT)
@@ -185,13 +174,12 @@ DECLARE
     today_date DATE := CURRENT_DATE;
     rec RECORD;
     computed_streak INT := 0;
-    computed_longest INT := 0;
     last_comp DATE := NULL;
     last_slip DATE := NULL;
     curr_streak INT := 0;
 BEGIN
-    SELECT "trackerType", "ruleStartDate", "longestStreak"
-    INTO target_type, start_date, computed_longest
+    SELECT "trackerType", "ruleStartDate"
+    INTO target_type, start_date
     FROM busy_bee.trackers
     WHERE id = p_tracker_id;
 
@@ -200,11 +188,13 @@ BEGIN
     END IF;
 
     IF target_type = 'maintain' THEN
-        -- Recompute streak and longest streak from ordered completion dates
+        -- Recompute streak from ordered completion dates on or after ruleStartDate
         FOR rec IN
             SELECT DISTINCT date AS comp_date
             FROM busy_bee.tracker_history
-            WHERE "trackerId" = p_tracker_id AND type = 'completion'
+            WHERE "trackerId" = p_tracker_id 
+              AND type = 'completion'
+              AND date >= start_date
             ORDER BY comp_date ASC
         LOOP
             IF last_comp IS NULL THEN
@@ -216,10 +206,6 @@ BEGIN
             END IF;
 
             last_comp := rec.comp_date;
-
-            IF curr_streak > computed_longest THEN
-                computed_longest := curr_streak;
-            END IF;
         END LOOP;
 
         -- Active streak must end on today or yesterday
@@ -232,40 +218,70 @@ BEGIN
         -- Update tracker row exactly once
         UPDATE busy_bee.trackers
         SET "currentStreak" = computed_streak,
-            "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
             "lastEventDate" = last_comp,
             "updatedAt" = now()
         WHERE id = p_tracker_id;
 
     ELSIF target_type = 'quit' THEN
-        -- Fetch most recent slip-up date
+        -- Fetch most recent slip-up date on or after ruleStartDate
         SELECT date
         INTO last_slip
         FROM busy_bee.tracker_history
-        WHERE "trackerId" = p_tracker_id AND type = 'slip_up'
+        WHERE "trackerId" = p_tracker_id 
+          AND type = 'slip_up'
+          AND date >= start_date
         ORDER BY date DESC
         LIMIT 1;
 
-        IF last_slip IS NOT NULL THEN
-            computed_streak := GREATEST(0, (today_date - last_slip));
-        ELSE
-            computed_streak := GREATEST(0, (today_date - start_date));
-        END IF;
-
-        IF computed_streak > computed_longest THEN
-            computed_longest := computed_streak;
-        END IF;
-
-        -- Update tracker row exactly once
+        -- For quit habits, streak is purely derived on the client from ruleStartDate or lastEventDate.
+        -- We only update lastEventDate and leave currentStreak at 0.
         UPDATE busy_bee.trackers
-        SET "currentStreak" = computed_streak,
-            "longestStreak" = GREATEST(COALESCE("longestStreak", 0), computed_longest),
+        SET "currentStreak" = 0,
             "lastEventDate" = last_slip,
             "updatedAt" = now()
         WHERE id = p_tracker_id;
     END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- --- SYNCHRONIZE HISTORY AND RECALCULATE ON START DATE CREATION OR CHANGE ---
+CREATE OR REPLACE FUNCTION busy_bee.sync_tracker_history_on_start_date_change()
+RETURNS TRIGGER AS $$
+DECLARE
+    today_date DATE := CURRENT_DATE;
+BEGIN
+    IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW."ruleStartDate" <> OLD."ruleStartDate") THEN
+        -- 1. Wipe any history records prior to the new start date
+        -- (For quit trackers, this wipes all slip-ups before the new start date; for maintain, it removes orphaned completions)
+        DELETE FROM busy_bee.tracker_history
+        WHERE "trackerId" = NEW.id AND date < NEW."ruleStartDate";
+
+        -- 2. For maintain trackers, backfill any missing completions from ruleStartDate to yesterday
+        IF NEW."trackerType" = 'maintain' AND NEW."ruleStartDate" < today_date THEN
+            INSERT INTO busy_bee.tracker_history (id, "userId", "trackerId", date, type)
+            SELECT 
+                gen_random_uuid()::text,
+                NEW."userId",
+                NEW.id,
+                d::date,
+                'completion'
+            FROM generate_series(NEW."ruleStartDate"::timestamp, (today_date - interval '1 day')::timestamp, interval '1 day') AS d
+            ON CONFLICT ("trackerId", date, type) DO NOTHING;
+        END IF;
+
+        -- 3. Atomically recalculate streak and lastEventDate
+        PERFORM busy_bee.recalculate_tracker_streak(NEW.id);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_tracker_created_backfill ON busy_bee.trackers;
+DROP TRIGGER IF EXISTS on_tracker_start_date_sync ON busy_bee.trackers;
+CREATE TRIGGER on_tracker_start_date_sync
+    AFTER INSERT OR UPDATE OF "ruleStartDate" ON busy_bee.trackers
+    FOR EACH ROW
+    EXECUTE FUNCTION busy_bee.sync_tracker_history_on_start_date_change();
 
 -- --- STATEMENT-LEVEL TRIGGERS WITH TRANSITION TABLES (O(1) BATCH EXECUTION) ---
 

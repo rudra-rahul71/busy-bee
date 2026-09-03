@@ -14,10 +14,16 @@ class TrackerCalculator {
     final todayZero = currentNow.dateOnly;
 
     if (tracker.trackerType == 'quit') {
-      final streakStart =
-          tracker.lastEventDate?.dateOnly ?? tracker.ruleStartDate.dateOnly;
-      final streak = todayZero.difference(streakStart).inDays;
-      return streak < 0 ? 0 : streak;
+      final start = tracker.ruleStartDate.dateOnly;
+
+      final lastSlip = tracker.lastEventDate?.dateOnly;
+      if (lastSlip != null) {
+        final daysSinceSlip = todayZero.difference(lastSlip).inDays;
+        return daysSinceSlip < 0 ? 0 : daysSinceSlip;
+      } else {
+        final daysDiff = todayZero.difference(start).inDays;
+        return daysDiff + 1;
+      }
     } else {
       if (tracker.lastEventDate == null) return 0;
       final lastEvent = tracker.lastEventDate!.dateOnly;

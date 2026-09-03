@@ -90,8 +90,9 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
           ? _startDate.dateOnly.addDays(_durationValue!)
           : null,
       rrule: 'FREQ=DAILY', // Simplified for now
-      currentStreak: isEdit ? widget.trackerToEdit!.currentStreak : 0,
-      longestStreak: isEdit ? widget.trackerToEdit!.longestStreak : 0,
+      currentStreak: isEdit && _type == 'maintain'
+          ? widget.trackerToEdit!.currentStreak
+          : 0,
       lastEventDate: isEdit ? widget.trackerToEdit!.lastEventDate : null,
       createdAt: isEdit ? widget.trackerToEdit!.createdAt : DateTime.now(),
       updatedAt: DateTime.now(),
@@ -303,8 +304,24 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
               }
               return null;
             },
+            onChanged: (value) {
+              setState(() {
+                _durationValue = int.tryParse(value);
+              });
+            },
             onSaved: (value) => _durationValue = int.tryParse(value ?? ''),
           ),
+          if (_durationValue != null && _durationValue! > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Target End Date: ${AppDateParser.formatDateOnly(_startDate.dateOnly.addDays(_durationValue!))}',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ],
       ],
     );
@@ -328,11 +345,12 @@ class _AddTrackerSheetState extends ConsumerState<AddTrackerSheet> {
       trailing: IconButton(
         icon: Icon(Icons.calendar_month, color: colorScheme.primary),
         onPressed: () async {
+          final now = DateTime.now();
           final pickedDate = await showDatePicker(
             context: context,
             initialDate: _startDate,
-            firstDate: DateTime.now().subtract(const Duration(days: 365)),
-            lastDate: DateTime.now().add(const Duration(days: 365)),
+            firstDate: now.subtract(const Duration(days: 365)),
+            lastDate: now,
           );
 
           if (pickedDate != null) {
