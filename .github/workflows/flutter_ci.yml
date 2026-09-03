@@ -89,7 +89,7 @@ jobs:
         working-directory: ./busy_bee
         run: flutter build macos --debug
 
-  # 4. Run E2E Tests (runs in parallel as native macOS desktop app - avoids simulator boot)
+  # 4. Run E2E Tests (runs on headless iOS simulator in CI)
   e2e-test:
     name: E2E Integration Test
     needs: quality-checks
@@ -108,6 +108,14 @@ jobs:
         working-directory: ./busy_bee
         run: flutter pub get
 
-      - name: Run E2E Test (macOS Desktop)
+      - name: Start iOS Simulator
+        run: |
+          DEVICE_UUID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone' | grep -oE '[0-9A-F-]{36}')
+          echo "Found simulator UUID: $DEVICE_UUID"
+          echo "SIMULATOR_UUID=$DEVICE_UUID" >> $GITHUB_ENV
+          xcrun simctl boot "$DEVICE_UUID" || true
+          xcrun simctl bootstatus "$DEVICE_UUID" -b
+
+      - name: Run E2E Test (iOS Simulator)
         working-directory: ./busy_bee
-        run: flutter test integration_test/app_test.dart -d macos
+        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID"
