@@ -118,4 +118,4 @@ jobs:
 
       - name: Run E2E Test (iOS Simulator)
         working-directory: ./busy_bee
-        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID"
+        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID" --reporter expanded

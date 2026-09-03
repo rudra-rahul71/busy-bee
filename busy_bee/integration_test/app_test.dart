@@ -43,7 +43,7 @@ void main() {
         final signUpToggle = find.text("Don't have an account? Sign Up");
         if (signUpToggle.evaluate().isNotEmpty) {
           await tester.tap(signUpToggle);
-          await tester.pumpAndSettle();
+          await tester.pump(const Duration(milliseconds: 500));
         }
 
         // Enter unique test credentials
@@ -55,8 +55,9 @@ void main() {
         expect(passwordField, findsOneWidget, reason: 'Password field must be present on Auth screen');
 
         await tester.enterText(emailField, testEmail);
+        await tester.pump(const Duration(milliseconds: 200));
         await tester.enterText(passwordField, 'Password123!');
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Submit sign up
         final submitAuthBtn = find.text('SIGN UP');
@@ -82,13 +83,13 @@ void main() {
 
       // 5. Navigate to the Trackers tab
       await tester.tap(trackersTab);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 800));
 
       // 6. Tap "Add Tracker" button
       final addTrackerBtn = find.text('Add Tracker');
       expect(addTrackerBtn, findsOneWidget);
       await tester.tap(addTrackerBtn);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 800));
 
       // Verify the sheet opened
       expect(find.byType(AddTrackerSheet), findsOneWidget);
@@ -98,16 +99,16 @@ void main() {
       final nameField = find.widgetWithText(TextFormField, 'Habit Name');
       expect(nameField, findsOneWidget);
       await tester.enterText(nameField, habitName);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 300));
 
       // 8. Scroll down to "Create Tracker" button and tap it
       final createBtn = find.widgetWithText(ElevatedButton, 'Create Tracker');
       expect(createBtn, findsOneWidget);
       await tester.ensureVisible(createBtn);
-      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 500));
 
       await tester.tap(createBtn);
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       // Wait for the async database request to finish and modal to dismiss
       for (int i = 0; i < 50; i++) {
