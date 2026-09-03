@@ -7,9 +7,10 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
-    runs-on: macos-latest
-
+  # 1. Fast-fail gate: Linter & Unit Tests on fast Ubuntu runner (~1.5 min)
+  quality-checks:
+    name: Code Quality & Unit Tests
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout busy-bee
         uses: actions/checkout@v4
@@ -32,9 +33,53 @@ jobs:
         working-directory: ./busy_bee
         run: flutter test
 
+  # 2. Build Android APK (runs in parallel on Ubuntu - much faster than macOS)
+  build-android:
+    name: Build Android APK
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
       - name: Build Android APK
         working-directory: ./busy_bee
         run: flutter build apk --debug
+
+  # 3. Build iOS & macOS (runs in parallel on macOS)
+  build-apple:
+    name: Build iOS & macOS
+    needs: quality-checks
+    runs-on: macos-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
 
       - name: Build iOS (No Codesign)
         working-directory: ./busy_bee
@@ -44,14 +89,25 @@ jobs:
         working-directory: ./busy_bee
         run: flutter build macos --debug
 
-      - name: Start iOS Simulator
-        run: |
-          DEVICE_UUID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone' | grep -oE '[0-9A-F-]{36}')
-          echo "Found simulator UUID: $DEVICE_UUID"
-          echo "SIMULATOR_UUID=$DEVICE_UUID" >> $GITHUB_ENV
-          xcrun simctl boot "$DEVICE_UUID" || true
-          xcrun simctl bootstatus "$DEVICE_UUID" -b
+  # 4. Run E2E Tests (runs in parallel as native macOS desktop app - avoids simulator boot)
+  e2e-test:
+    name: E2E Integration Test
+    needs: quality-checks
+    runs-on: macos-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
 
-      - name: Run E2E Integration Test (iOS)
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
         working-directory: ./busy_bee
-        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID"
+        run: flutter pub get
+
+      - name: Run E2E Test (macOS Desktop)
+        working-directory: ./busy_bee
+        run: flutter test integration_test/app_test.dart -d macos
