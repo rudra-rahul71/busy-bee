@@ -1,0 +1,121 @@
+name: Flutter CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # 1. Fast-fail gate: Linter & Unit Tests on fast Ubuntu runner (~1.5 min)
+  quality-checks:
+    name: Code Quality & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
+      - name: Analyze project source
+        working-directory: ./busy_bee
+        run: flutter analyze
+
+      - name: Run unit and widget tests
+        working-directory: ./busy_bee
+        run: flutter test
+
+  # 2. Build Android APK (runs in parallel on Ubuntu - much faster than macOS)
+  build-android:
+    name: Build Android APK
+    needs: quality-checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
+      - name: Build Android APK
+        working-directory: ./busy_bee
+        run: flutter build apk --debug
+
+  # 3. Build iOS & macOS (runs in parallel on macOS)
+  build-apple:
+    name: Build iOS & macOS
+    needs: quality-checks
+    runs-on: macos-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
+      - name: Build iOS (No Codesign)
+        working-directory: ./busy_bee
+        run: flutter build ios --no-codesign --debug
+
+      - name: Build macOS
+        working-directory: ./busy_bee
+        run: flutter build macos --debug
+
+  # 4. Run E2E Tests (runs on headless iOS simulator in CI)
+  e2e-test:
+    name: E2E Integration Test
+    needs: quality-checks
+    runs-on: macos-latest
+    steps:
+      - name: Checkout busy-bee
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        working-directory: ./busy_bee
+        run: flutter pub get
+
+      - name: Start iOS Simulator
+        run: |
+          DEVICE_UUID=$(xcrun simctl list devices available | grep -m 1 -E 'iPhone' | grep -oE '[0-9A-F-]{36}')
+          echo "Found simulator UUID: $DEVICE_UUID"
+          echo "SIMULATOR_UUID=$DEVICE_UUID" >> $GITHUB_ENV
+          xcrun simctl boot "$DEVICE_UUID" || true
+          xcrun simctl bootstatus "$DEVICE_UUID" -b
+
+      - name: Run E2E Test (iOS Simulator)
+        working-directory: ./busy_bee
+        run: flutter test integration_test/app_test.dart -d "$SIMULATOR_UUID" --reporter expanded

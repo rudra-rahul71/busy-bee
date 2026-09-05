@@ -9,7 +9,6 @@ class Tracker {
   final DateTime ruleStartDate;
   final DateTime? ruleEndDate;
   final int currentStreak;
-  final int longestStreak;
   final DateTime? lastEventDate;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -23,7 +22,6 @@ class Tracker {
     required this.ruleStartDate,
     this.ruleEndDate,
     this.currentStreak = 0,
-    this.longestStreak = 0,
     this.lastEventDate,
     required this.createdAt,
     required this.updatedAt,
@@ -38,7 +36,6 @@ class Tracker {
     DateTime? ruleStartDate,
     DateTime? ruleEndDate,
     int? currentStreak,
-    int? longestStreak,
     DateTime? lastEventDate,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -52,7 +49,6 @@ class Tracker {
       ruleStartDate: ruleStartDate ?? this.ruleStartDate,
       ruleEndDate: ruleEndDate ?? this.ruleEndDate,
       currentStreak: currentStreak ?? this.currentStreak,
-      longestStreak: longestStreak ?? this.longestStreak,
       lastEventDate: lastEventDate ?? this.lastEventDate,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -69,7 +65,6 @@ class Tracker {
       ruleStartDate: AppDateParser.parseDateOnly(json['ruleStartDate']),
       ruleEndDate: AppDateParser.parseNullableDateOnly(json['ruleEndDate']),
       currentStreak: json['currentStreak'] as int? ?? 0,
-      longestStreak: json['longestStreak'] as int? ?? 0,
       lastEventDate: AppDateParser.parseNullableDateOnly(json['lastEventDate']),
       createdAt: AppDateParser.parseDateTime(json['createdAt']),
       updatedAt: AppDateParser.parseDateTime(json['updatedAt']),
@@ -84,12 +79,9 @@ class Tracker {
       'trackerType': trackerType,
       'rrule': rrule,
       'ruleStartDate': AppDateParser.formatDateOnly(ruleStartDate),
-      if (ruleEndDate != null)
-        'ruleEndDate': AppDateParser.formatDateOnly(ruleEndDate!),
+      'ruleEndDate':
+          ruleEndDate != null ? AppDateParser.formatDateOnly(ruleEndDate!) : null,
       'currentStreak': currentStreak,
-      'longestStreak': longestStreak,
-      if (lastEventDate != null)
-        'lastEventDate': AppDateParser.formatDateOnly(lastEventDate!),
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
     };

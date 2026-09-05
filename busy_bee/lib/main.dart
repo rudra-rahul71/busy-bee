@@ -16,6 +16,7 @@ import 'features/tasks/presentation/pages/tasks.dart';
 import 'features/trackers/presentation/pages/trackers.dart';
 import 'core/widgets/app_shell.dart';
 import 'core/config/app_environment.dart';
+import 'core/services/noop_notification_service.dart';
 
 final configServiceProvider = Provider((ref) => ConfigService());
 
@@ -33,6 +34,7 @@ Future<void> initializeBackend(
   AppConfig config, {
   ProviderContainer? container,
   WidgetRef? ref,
+  bool enableNotifications = true,
 }) async {
   await DynamicBackendBridge.initialize(
     config: config,
@@ -44,28 +46,33 @@ Future<void> initializeBackend(
     defaultNotificationChannelId: 'busy_bee',
     defaultNotificationChannelName: 'Busy Bee Notifications',
     defaultNotificationChannelDesc: 'Notifications for Busy Bee',
-    enableRemoteNotifications: true,
+    enableRemoteNotifications: enableNotifications,
+    notificationService: enableNotifications ? null : NoOpNotificationService(),
     appId: 'busy_bee',
   );
 }
 
-void main() async {
+Future<void> main({bool enableNotifications = true}) async {
+  debugPrint('[main] 1. Initializing WidgetsFlutterBinding...');
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Try to init firebase, ignore if missing config
+  debugPrint('[main] 2. Initializing Firebase...');
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(seconds: 3));
   } catch (e) {
-    debugPrint('Firebase init error: $e');
+    debugPrint('[main] Firebase init error/timeout: $e');
   }
 
+  debugPrint('[main] 3. Initializing SharedPreferences...');
   final prefs = await SharedPreferences.getInstance();
 
+  debugPrint('[main] 4. Loading saved config...');
   final configService = ConfigService();
   final savedConfig = await configService.getSavedConfig();
 
+  debugPrint('[main] 5. Creating ProviderContainer...');
   final container = ProviderContainer(
     overrides: [
       sharedPreferencesProvider.overrideWithValue(prefs),
@@ -74,15 +81,24 @@ void main() async {
   );
 
   if (savedConfig != null) {
+    debugPrint('[main] 6. Initializing backend with config (${savedConfig.backendType.name})...');
     container.read(appConfigProvider.notifier).setConfig(savedConfig);
     try {
-      await initializeBackend(savedConfig, container: container);
+      await initializeBackend(
+        savedConfig,
+        container: container,
+        enableNotifications: enableNotifications,
+      );
     } catch (e) {
-      debugPrint('Error initializing saved backend config: $e');
+      debugPrint('[main] Error initializing saved backend config: $e');
     }
+  } else {
+    debugPrint('[main] 6. No saved config found; skipping backend init.');
   }
 
+  debugPrint('[main] 7. Running runApp()...');
   runApp(UncontrolledProviderScope(container: container, child: const MyApp()));
+  debugPrint('[main] 8. runApp() executed successfully.');
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
