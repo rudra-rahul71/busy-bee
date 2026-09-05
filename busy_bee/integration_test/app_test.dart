@@ -14,16 +14,18 @@ void main() {
 
   group('E2E Test', () {
     testWidgets('Create a new habit tracker, verify DB persistence, and clean up', (tester) async {
-      // 1. Ensure backend config exists so app never halts on the hosting wizard
+      debugPrint('[E2E Test] Step 1: Pre-configuring backend to skip hosting wizard...');
       final configService = ConfigService();
       final existingConfig = await configService.getSavedConfig();
       if (existingConfig == null) {
-        // Default to managed backend if not configured
         await configService.saveConfig(AppConfig(backendType: BackendType.managed));
+        debugPrint('[E2E Test] Pre-seeded managed backend configuration.');
       }
 
-      // 2. Launch the application
-      await app.main();
+      // 2. Launch the application without push notifications (to prevent blocking permission dialogs on simulator)
+      debugPrint('[E2E Test] Step 2: Booting application...');
+      await app.main(enableRemoteNotifications: false);
+      debugPrint('[E2E Test] app.main() booted. Waiting for initial UI frame...');
 
       // Wait for app to finish loading the initial screen
       for (int i = 0; i < 50; i++) {
@@ -31,6 +33,7 @@ void main() {
         if (find.byIcon(Icons.track_changes_outlined).evaluate().isNotEmpty ||
             find.text('SIGN IN').evaluate().isNotEmpty ||
             find.text('SIGN UP').evaluate().isNotEmpty) {
+          debugPrint('[E2E Test] Initial screen rendered after ${(i + 1) * 100}ms');
           break;
         }
       }
@@ -82,10 +85,12 @@ void main() {
       );
 
       // 5. Navigate to the Trackers tab
+      debugPrint('[E2E Test] Step 5: Tapping Trackers tab...');
       await tester.tap(trackersTab);
       await tester.pump(const Duration(milliseconds: 800));
 
       // 6. Tap "Add Tracker" button
+      debugPrint('[E2E Test] Step 6: Opening Add Tracker sheet...');
       final addTrackerBtn = find.text('Add Tracker');
       expect(addTrackerBtn, findsOneWidget);
       await tester.tap(addTrackerBtn);
@@ -96,12 +101,14 @@ void main() {
 
       // 7. Fill in the tracker name
       final habitName = 'E2E Habit ${DateTime.now().millisecondsSinceEpoch % 10000}';
+      debugPrint('[E2E Test] Step 7: Entering habit name: "$habitName"...');
       final nameField = find.widgetWithText(TextFormField, 'Habit Name');
       expect(nameField, findsOneWidget);
       await tester.enterText(nameField, habitName);
       await tester.pump(const Duration(milliseconds: 300));
 
       // 8. Scroll down to "Create Tracker" button and tap it
+      debugPrint('[E2E Test] Step 8: Scrolling to and tapping Create Tracker...');
       final createBtn = find.widgetWithText(ElevatedButton, 'Create Tracker');
       expect(createBtn, findsOneWidget);
       await tester.ensureVisible(createBtn);
@@ -111,6 +118,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       // Wait for the async database request to finish and modal to dismiss
+      debugPrint('[E2E Test] Step 9: Waiting for modal to dismiss...');
       for (int i = 0; i < 50; i++) {
         await tester.pump(const Duration(milliseconds: 200));
         if (find.byType(AddTrackerSheet).evaluate().isEmpty) {
@@ -134,8 +142,10 @@ void main() {
 
       // Assert that the sheet dismissed (proves form was submitted successfully)
       expect(find.byType(AddTrackerSheet), findsNothing);
+      debugPrint('[E2E Test] Sheet successfully dismissed!');
 
       // 9. Verify the new tracker card appears in the UI
+      debugPrint('[E2E Test] Step 10: Waiting for TrackerCard to appear in UI...');
       for (int i = 0; i < 50; i++) {
         await tester.pump(const Duration(milliseconds: 200));
         if (find.widgetWithText(TrackerCard, habitName).evaluate().isNotEmpty) {
@@ -143,8 +153,10 @@ void main() {
         }
       }
       expect(find.widgetWithText(TrackerCard, habitName), findsOneWidget);
+      debugPrint('[E2E Test] TrackerCard confirmed visible on screen!');
 
       // 10. Direct Database Verification: Query PostgreSQL directly through the collection
+      debugPrint('[E2E Test] Step 11: Directly verifying row in PostgreSQL via API...');
       final element = tester.element(find.byType(app.MyApp));
       final container = ProviderScope.containerOf(element);
       final trackerCollection = container.read(trackerCollectionProvider);
@@ -161,6 +173,7 @@ void main() {
       debugPrint('[E2E Test] Verified tracker exists in database: ID=${dbRows.first.id}, Summary="${dbRows.first.summary}"');
 
       // 11. Cleanup: Delete the created test record so it leaves zero database pollution
+      debugPrint('[E2E Test] Step 12: Cleaning up test row from database...');
       await trackerCollection.delete(dbRows.first.id);
       debugPrint('[E2E Test] Successfully cleaned up test record ID=${dbRows.first.id} from database.');
     });

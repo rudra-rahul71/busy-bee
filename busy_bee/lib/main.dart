@@ -33,6 +33,7 @@ Future<void> initializeBackend(
   AppConfig config, {
   ProviderContainer? container,
   WidgetRef? ref,
+  bool enableRemoteNotifications = true,
 }) async {
   await DynamicBackendBridge.initialize(
     config: config,
@@ -44,12 +45,12 @@ Future<void> initializeBackend(
     defaultNotificationChannelId: 'busy_bee',
     defaultNotificationChannelName: 'Busy Bee Notifications',
     defaultNotificationChannelDesc: 'Notifications for Busy Bee',
-    enableRemoteNotifications: true,
+    enableRemoteNotifications: enableRemoteNotifications,
     appId: 'busy_bee',
   );
 }
 
-Future<void> main() async {
+Future<void> main({bool enableRemoteNotifications = true}) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Try to init firebase, ignore if missing config
@@ -76,7 +77,11 @@ Future<void> main() async {
   if (savedConfig != null) {
     container.read(appConfigProvider.notifier).setConfig(savedConfig);
     try {
-      await initializeBackend(savedConfig, container: container);
+      await initializeBackend(
+        savedConfig,
+        container: container,
+        enableRemoteNotifications: enableRemoteNotifications,
+      );
     } catch (e) {
       debugPrint('Error initializing saved backend config: $e');
     }
