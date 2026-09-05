@@ -24,7 +24,7 @@ void main() {
 
       // 2. Launch the application without push notifications (to prevent blocking permission dialogs on simulator)
       debugPrint('[E2E Test] Step 2: Booting application...');
-      await app.main(enableRemoteNotifications: false);
+      await app.main(enableNotifications: false);
       debugPrint('[E2E Test] app.main() booted. Waiting for initial UI frame...');
 
       // Wait for app to finish loading the initial screen
