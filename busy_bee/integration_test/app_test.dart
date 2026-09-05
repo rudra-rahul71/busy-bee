@@ -51,26 +51,35 @@ void main() {
 
         // Enter unique test credentials
         final testEmail = 'e2e_user_${DateTime.now().millisecondsSinceEpoch}@test.com';
-        final emailField = find.widgetWithText(TextFormField, 'Email');
-        final passwordField = find.widgetWithText(TextFormField, 'Password');
+        final emailField = find.widgetWithText(TextFormField, 'Email Address').evaluate().isNotEmpty
+            ? find.widgetWithText(TextFormField, 'Email Address')
+            : find.byType(TextFormField).at(0);
+        final passwordField = find.widgetWithText(TextFormField, 'Password').evaluate().isNotEmpty
+            ? find.widgetWithText(TextFormField, 'Password')
+            : find.byType(TextFormField).at(1);
 
         expect(emailField, findsOneWidget, reason: 'Email field must be present on Auth screen');
         expect(passwordField, findsOneWidget, reason: 'Password field must be present on Auth screen');
 
+        debugPrint('[E2E Test] Entering test credentials (Email: $testEmail)...');
         await tester.enterText(emailField, testEmail);
         await tester.pump(const Duration(milliseconds: 200));
         await tester.enterText(passwordField, 'Password123!');
         await tester.pump(const Duration(milliseconds: 500));
 
         // Submit sign up
+        debugPrint('[E2E Test] Tapping SIGN UP...');
         final submitAuthBtn = find.text('SIGN UP');
         expect(submitAuthBtn, findsOneWidget);
         await tester.tap(submitAuthBtn);
+        await tester.pump(const Duration(milliseconds: 500));
 
         // Wait for auth to complete and home screen navigation shell to mount
+        debugPrint('[E2E Test] Waiting for authentication and shell mount...');
         for (int i = 0; i < 60; i++) {
           await tester.pump(const Duration(milliseconds: 200));
           if (find.byIcon(Icons.track_changes_outlined).evaluate().isNotEmpty) {
+            debugPrint('[E2E Test] Main shell mounted after ${(i + 1) * 200}ms');
             break;
           }
         }
